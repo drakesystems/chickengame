@@ -48,8 +48,8 @@
   <div class="screen"><canvas id="game" aria-label="Chicken driving game"></canvas></div>
   <div class="hint">
     <span>
-      <span class="key">S</span> <b>Stop</b> &nbsp;·&nbsp;
-      <span class="key">G</span> <b>Go</b> &nbsp;·&nbsp;
+      <span class="key">Space</span> <b>Start / Stop / Go</b> &nbsp;·&nbsp;
+      <span class="key">Enter</span> <b>Continue</b> &nbsp;·&nbsp;
       <span class="key">R</span> <b>Restart run</b>
     </span>
     <span style="display:flex;gap:8px">
@@ -266,25 +266,24 @@ var BTN_NEXT   = {x: W/2+16,  y: 340, w: 220, h: 62};
 function hit(b, mx, my){ return mx>=b.x && mx<=b.x+b.w && my>=b.y && my<=b.y+b.h; }
 
 window.addEventListener('keydown', function(e){
-  var k = e.key ? e.key.toLowerCase() : '';
-  if(state === ST.TITLE || state === ST.OVER){
-    if(e.code==='Space' || e.code==='Enter'){ e.preventDefault(); beep(660,0.09,'square',0.05); startRun(); }
-    return;
-  }
-  if(state === ST.CRASHED){
-    if(e.code==='Space'){ e.preventDefault(); retryRound(); }
-    else if(e.code==='Enter'){ e.preventDefault(); nextRound(); }
-    else if(k==='r'){ e.preventDefault(); beep(500,0.09,'square',0.05); startRun(); }
-    return;
-  }
-  if(k==='s'){ e.preventDefault(); pressStop(); }
-  else if(k==='g'){ e.preventDefault(); pressGo(); }
-  else if(e.code==='Space' || e.code==='Enter'){
+  if(e.code === 'Space'){
     e.preventDefault();
-    if(state===ST.ROUND_READY) beginRound();
-    else if(state===ST.STOPPED) pressBank();
+    if(state===ST.TITLE || state===ST.OVER){ beep(660,0.09,'square',0.05); startRun(); }
+    else if(state===ST.ROUND_READY){ beginRound(); }
+    else if(state===ST.MOVING){ pressStop(); }
+    else if(state===ST.STOPPED){ pressGo(); }
+    else if(state===ST.CRASHED){ retryRound(); }
+    return;
   }
-  else if(k==='r'){ e.preventDefault(); beep(500,0.09,'square',0.05); startRun(); }
+  if(e.code === 'Enter'){
+    e.preventDefault();
+    if(state===ST.TITLE || state===ST.OVER){ beep(660,0.09,'square',0.05); startRun(); }
+    else if(state===ST.STOPPED){ pressBank(); }
+    else if(state===ST.CRASHED){ nextRound(); }
+    return;
+  }
+  var k = e.key ? e.key.toLowerCase() : '';
+  if(k === 'r'){ e.preventDefault(); beep(500,0.09,'square',0.05); startRun(); }
 });
 
 cvs.addEventListener('pointerdown', function(e){
@@ -710,9 +709,9 @@ function drawControls(){
     drawBtn(BTN_BEGIN, C.green, 'BEGIN', 'SPACE');
   } else if(state === ST.MOVING || state === ST.BRAKING || state === ST.STOPPED){
     var movingNow = (state === ST.MOVING);
-    drawBtn(BTN_STOP, C.red,   'STOP  ·  S', null, !movingNow);
-    drawBtn(BTN_GO,   C.green, 'GO  ·  G',   null, movingNow);
-    drawBtn(BTN_BANK, C.gold,  'BANK & NEXT', 'SPACE', movingNow);
+    drawBtn(BTN_STOP, C.red,   'STOP', 'SPACE', !movingNow);
+    drawBtn(BTN_GO,   C.green, 'GO',   'SPACE', movingNow);
+    drawBtn(BTN_BANK, C.gold,  'BANK & NEXT', 'ENTER', movingNow);
   }
 }
 
