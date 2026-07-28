@@ -48,8 +48,8 @@
   <div class="screen"><canvas id="game" aria-label="Chicken driving game"></canvas></div>
   <div class="hint">
     <span>
-      <span class="key">Space</span> <b>Start / Stop / Go</b> &nbsp;·&nbsp;
-      <span class="key">Enter</span> <b>Continue</b> &nbsp;·&nbsp;
+      <span class="key">Space</span> <b>Start / Stop on yellow</b> &nbsp;·&nbsp;
+      <b>5 rounds — one red ends the run</b> &nbsp;·&nbsp;
       <span class="key">R</span> <b>Restart run</b>
     </span>
     <span style="display:flex;gap:8px">
@@ -131,37 +131,64 @@ function noiseThud(){
 var HORIZON = 320, ROAD_TOP = 372, ROAD_BOT = 462, GROUND = 440;
 var CONTROL_BAR_Y = 552;   // everything below this is the dashboard, not the road scene
 var CAR_X = 210, CAR_LEN = 128;
-var CRUISE = 160;      // px/s while moving — matched to the point ruler below
-var ACCEL = 260, DECEL_VIS = 6.0; // visual-only glide, see notes at STOP handling
+var CRUISE = 160;              // px/s the moment yellow opens
+var YELLOW_ACCEL = 85;         // px/s² — the car keeps winding up all through yellow
+var MAX_SPEED = 520;           // px/s ceiling
+var BRAKE_DECEL = 900;         // px/s² of the stopping glide
 
 /* ================= scoring =================
-   Faithful to the source instrument: points accrue with distance/time
-   moved. A crash only forfeits THIS ROUND's points — the bank is never
-   touched. Stopping is immediately safe; going again rolls a brand new,
-   independently-randomized green/yellow/red window.                    */
-var PPX = 0.25;         // points per pixel of travel  (=> 40 pts/sec at CRUISE)
-var TOTAL_ROUNDS = 15;
+   ONE LIGHT = ONE ROUND. Five rounds make a run, and the wall ends it —
+   there is no bank to fall back on, you start again from round 1.
+
+   DISTANCE — the only points, and they are earned ONLY while the light is
+   yellow. Green pays nothing, braking pays nothing. The car accelerates
+   the whole time yellow is up, so each extra second is worth more than
+   the one before it.
+
+   SPEED BONUS — paid once, at the end of a clean five-round run, on the
+   average speed you held across the whole run. Every round costs the same
+   fixed dead time (the green roll-up, the brake, the standing start), so
+   the only way to raise that average is to push deeper into the yellow
+   and let the car wind up. Going further on yellow IS the fast line.   */
+var PPX = 0.25;                 // points per pixel of travel
+var TOTAL_ROUNDS = 5;           // five lights, five rounds
+
+var YELLOW_MIN = 1.8, YELLOW_MAX = 7.0;   // seconds of yellow, re-rolled per round
+var WALL_LEAD = 60;                       // px the wall drops ahead of the bumper
+var GREEN_TIME = 0.9;                     // seconds of green before yellow opens
+
+var SPEED_BONUS_RATE = 8;       // bonus points per px/s of average speed over CRUISE
 
 function randRange(a,b){ return a + Math.random()*(b-a); }
-function rollRoundThreshold(){
-  return randRange(1.5, 7.0);
+function rollYellowTime(){
+  return randRange(YELLOW_MIN, YELLOW_MAX);
+}
+function avgSpeed(){
+  return runTime > 0.2 ? runDist/runTime : 0;
+}
+function speedBonusNow(){
+  return Math.max(0, Math.round((avgSpeed() - CRUISE) * SPEED_BONUS_RATE));
 }
 
 /* ================= state ================= */
 var ST = {
   TITLE:0, ROUND_READY:1, ENTER:2, MOVING:3, BRAKING:4,
-  STOPPED:5, RESOLVE_BANK:6, RESOLVE_CRASH:7, CRASHED:8, OVER:9
+  RED:5, RESOLVE_ROUND:6, RESOLVE_CRASH:7, GAMEOVER:8, OVER:9, GREEN:10
 };
 var state = ST.TITLE, st = 0;
 
 var round = 0;                 // 0-indexed, 0..TOTAL_ROUNDS-1
-var bank = 0, shownBank = 0;
-var roundPoints = 0, restarts = 0;
-var roundMovingTime = 0, roundThreshold = 0;
-var results = [];              // 'bank' | 'crash' per round
-var banksCount = 0, crashesCount = 0, bestBank = 0;
+var score = 0, shownScore = 0; // distance points across the whole run
+var roundPoints = 0;           // distance points earned in the current round
+var scoredTravel = 0;          // px travelled while yellow this run (drives the ruler)
+var runTime = 0, runDist = 0;  // whole-run clock and odometer, for the speed bonus
+var finalBonus = 0, finalTotal = 0;
+var runLost = false;           // true once the wall has ended the run
+var yellowTime = 0, yellowLimit = 0;
+var results = [];              // 'clear' per round survived
+var bestScore = 0;
 
-var car, leg, wall;
+var car, light, wall;          // light: 'off' | 'green' | 'yellow' | 'red'
 var travel = 0, spin = 0, shake = 0, flash = 0, banner = null;
 var bits = [], floats = [], clouds = [];
 
@@ -170,17 +197,21 @@ for(var ci=0; ci<5; ci++){
 }
 
 function newRoundReady(){
-  roundPoints = 0; restarts = 0;
-  roundMovingTime = 0; roundThreshold = rollRoundThreshold();
+  roundPoints = 0;
+  yellowTime = 0; yellowLimit = rollYellowTime();
   car = {x:-190, v:0, enter:0, dead:false, squash:0, tilt:0, visV:0};
-  leg = {phase:'idle', t:0};
-  wall = {up:false, rise:0, x:0};
+  light = 'green';
+  wall = {up:false, rise:0, x:0, landed:false};
   banner = null; bits = [];
   state = ST.ROUND_READY; st = 0;
 }
 
+/* A run is all five rounds. The wall wipes it — this is the only reset. */
 function startRun(){
-  round = 0; bank = 0; shownBank = 0; results = []; banksCount = 0; crashesCount = 0;
+  round = 0; results = [];
+  score = 0; shownScore = 0; scoredTravel = 0;
+  runTime = 0; runDist = 0; runLost = false;
+  finalBonus = 0; finalTotal = 0;
   newRoundReady();
 }
 
@@ -190,96 +221,92 @@ function beginRound(){
   state = ST.ENTER; st = 0;
 }
 
-function pressGo(){
-  if(state !== ST.ROUND_READY && state !== ST.STOPPED) return;
-  if(state === ST.ROUND_READY){ beginRound(); return; }
-  restarts++;
-  leg.phase = 'yellow'; leg.t = 0;
-  state = ST.MOVING;
-  beep(520,0.08,'square',0.05);
-}
-
 function pressStop(){
   if(state !== ST.MOVING) return;
-  // Stopping is immediately safe: this leg's hidden timer is cancelled the
-  // instant the player commits to stopping. Only the visual glide continues.
+  // Stopping while yellow is up is immediately safe: the hidden yellow timer
+  // is cancelled the instant the player commits. Only the visual glide runs on.
   car.visV = car.v;
-  leg.phase = 'idle';
   state = ST.BRAKING; st = 0;
   beep(260,0.12,'sawtooth',0.05);
 }
 
-function pressBank(){
-  if(state !== ST.STOPPED) return;
+/* Stopped on yellow = round survived. Its distance points are already in the
+   score; the run rolls straight on to the next light. */
+function passRound(){
   var pts = Math.round(roundPoints);
-  bank += pts;
-  results.push('bank'); banksCount++;
-  banner = {big:'BANKED', sub:'+'+pts+' TO YOUR ACCOUNT', col:C.green};
-  floats.push({x:car.x+CAR_LEN-20, y:GROUND-108, txt:'+'+pts, col:C.gold, life:1.1, vy:-42, size:30});
-  beep(880,0.10,'square',0.06);
-  setTimeout(function(){ beep(1180,0.12,'square',0.05); }, 90);
-  state = ST.RESOLVE_BANK; st = 0;
+  results.push('clear');
+  light = 'green';
+  banner = {big:'ROUND '+(round+1)+' CLEAR', sub:'+'+pts+' DISTANCE', col:C.green};
+  floats.push({x:car.x+CAR_LEN-20, y:GROUND-108, txt:'+'+pts, col:C.gold, life:1.0, vy:-40, size:26});
+  beep(880,0.09,'square',0.055);
+  setTimeout(function(){ beep(1180,0.11,'square',0.05); }, 85);
+  state = ST.RESOLVE_ROUND; st = 0;
 }
 
+/* Five rounds survived. The speed bonus is settled here, on the average
+   speed held across the entire run. */
+function finishRun(){
+  finalBonus = speedBonusNow();
+  finalTotal = Math.round(score) + finalBonus;
+  bestScore = Math.max(bestScore, finalTotal);
+  state = ST.OVER; st = 0;
+  beep(660,0.12,'square',0.05);
+  setTimeout(function(){ beep(880,0.16,'square',0.05); }, 130);
+  setTimeout(function(){ beep(1180,0.20,'square',0.05); }, 260);
+}
+
+/* Each of the five rounds gets its own independently rolled yellow window. */
+function openYellow(){
+  light = 'yellow';
+  yellowTime = 0; yellowLimit = rollYellowTime();
+  state = ST.MOVING; st = 0;
+  beep(520,0.08,'square',0.05);
+}
+
+/* The yellow window ran out. Red always drops the wall — there is no roll. */
+function turnRed(){
+  light = 'red';
+  // lead scales with speed so the wall always lands before you reach it
+  wall.x = car.x + CAR_LEN + Math.max(WALL_LEAD, car.v*0.28);
+  wall.up = true; wall.rise = 0; wall.landed = false;
+  shake = Math.max(shake, 10);
+  beep(180,0.20,'sawtooth',0.08);
+  state = ST.RED; st = 0;
+}
+
+/* The wall ends the run outright — everything goes, back to round 1. */
 function crash(){
-  crashesCount++;
-  results.push('crash');
+  var lost = Math.round(score) + speedBonusNow();
+  runLost = true;
   car.dead = true; car.v = 0; car.squash = 1; car.tilt = 0.9;
   shake = 26; flash = 1;
   noiseThud(); beep(120,0.35,'sawtooth',0.10);
-  banner = {big:'CRASH!', sub:'ROUND LOST — BANK UNCHANGED', col:C.red};
-  floats.push({x:car.x+CAR_LEN-30, y:GROUND-118, txt:'-'+Math.round(roundPoints), col:'#FF7A7A', life:1.3, vy:-34, size:28});
-  roundPoints = 0;
-  wall.x = car.x + CAR_LEN + 16;
-  wall.up = true; wall.rise = 0;
+  banner = {big:'CRASH!', sub:'RAN THE RED IN ROUND '+(round+1)+' — RUN OVER', col:C.red};
+  floats.push({x:car.x+CAR_LEN-30, y:GROUND-118, txt:'-'+lost, col:'#FF7A7A', life:1.3, vy:-34, size:28});
+  score = 0; roundPoints = 0;
   spawnDebris(wall.x, true);
   state = ST.RESOLVE_CRASH; st = 0;
 }
 
-function retryRound(){
-  if(results.length) results.pop();
-  crashesCount = Math.max(0, crashesCount-1);
-  newRoundReady();
-  beep(700,0.10,'square',0.05);
-}
-
 function nextRound(){
   round++;
-  if(round >= TOTAL_ROUNDS){
-    bestBank = Math.max(bestBank, bank);
-    state = ST.OVER; st = 0;
-    beep(660,0.12,'square',0.05);
-    setTimeout(function(){ beep(880,0.16,'square',0.05); }, 130);
-  } else {
-    newRoundReady();
-  }
+  if(round >= TOTAL_ROUNDS) finishRun();
+  else newRoundReady();
 }
 
 /* ================= input ================= */
 var BTN_BEGIN  = {x: W/2-110, y: 578, w: 220, h: 56};
-var BTN_STOP   = {x: 300, y: 578, w: 170, h: 56};
-var BTN_GO     = {x: 490, y: 578, w: 170, h: 56};
-var BTN_BANK   = {x: 680, y: 578, w: 190, h: 56};
-var BTN_RETRY  = {x: W/2-236, y: 340, w: 220, h: 62};
-var BTN_NEXT   = {x: W/2+16,  y: 340, w: 220, h: 62};
+var BTN_STOP   = {x: W/2-130, y: 578, w: 260, h: 56};
 
 function hit(b, mx, my){ return mx>=b.x && mx<=b.x+b.w && my>=b.y && my<=b.y+b.h; }
+function atStartScreen(){ return state===ST.TITLE || state===ST.OVER || state===ST.GAMEOVER; }
 
 window.addEventListener('keydown', function(e){
-  if(e.code === 'Space'){
+  if(e.code === 'Space' || e.code === 'Enter'){
     e.preventDefault();
-    if(state===ST.TITLE || state===ST.OVER){ beep(660,0.09,'square',0.05); startRun(); }
+    if(atStartScreen()){ beep(660,0.09,'square',0.05); startRun(); }
     else if(state===ST.ROUND_READY){ beginRound(); }
     else if(state===ST.MOVING){ pressStop(); }
-    else if(state===ST.STOPPED){ pressGo(); }
-    else if(state===ST.CRASHED){ retryRound(); }
-    return;
-  }
-  if(e.code === 'Enter'){
-    e.preventDefault();
-    if(state===ST.TITLE || state===ST.OVER){ beep(660,0.09,'square',0.05); startRun(); }
-    else if(state===ST.STOPPED){ pressBank(); }
-    else if(state===ST.CRASHED){ nextRound(); }
     return;
   }
   var k = e.key ? e.key.toLowerCase() : '';
@@ -292,15 +319,9 @@ cvs.addEventListener('pointerdown', function(e){
   var mx = (e.clientX - r.left) * (W/r.width);
   var my = (e.clientY - r.top) * (H/r.height);
 
-  if(state === ST.TITLE || state === ST.OVER){ beep(660,0.09,'square',0.05); startRun(); return; }
-  if(state === ST.CRASHED){
-    if(hit(BTN_NEXT, mx, my)){ nextRound(); return; }
-    retryRound(); return;
-  }
+  if(atStartScreen()){ beep(660,0.09,'square',0.05); startRun(); return; }
   if(state === ST.ROUND_READY && hit(BTN_BEGIN, mx, my)){ beginRound(); return; }
   if(state === ST.MOVING && hit(BTN_STOP, mx, my)){ pressStop(); return; }
-  if(state === ST.STOPPED && hit(BTN_GO, mx, my)){ pressGo(); return; }
-  if(state === ST.STOPPED && hit(BTN_BANK, mx, my)){ pressBank(); return; }
 });
 
 document.getElementById('restart').addEventListener('click', function(){
@@ -330,10 +351,14 @@ function spawnDebris(atX, big){
 }
 
 /* ================= update ================= */
+/* Every pixel the car covers, in any phase, counts on the run odometer —
+   that plus the run clock is the average speed the bonus is paid on. */
+function roll(px){ travel += px; spin += px; runDist += px; }
+
 function update(dt){
   st += dt;
-  shownBank += (bank - shownBank) * Math.min(1, dt*7);
-  if(Math.abs(bank-shownBank) < 0.6) shownBank = bank;
+  shownScore += (score - shownScore) * Math.min(1, dt*9);
+  if(Math.abs(score-shownScore) < 0.6) shownScore = score;
   shake = Math.max(0, shake - dt*46);
   flash = Math.max(0, flash - dt*2.6);
 
@@ -352,7 +377,21 @@ function update(dt){
     p.life -= dt;
     if(p.life<=0) bits.splice(b,1);
   }
-  if(wall.up && wall.rise < 1) wall.rise = Math.min(1, wall.rise + dt*7);
+  if(wall.up && wall.rise < 1){
+    wall.rise = Math.min(1, wall.rise + dt*9);
+    if(wall.rise >= 1 && !wall.landed){   // dust kicked up where it hits the road
+      wall.landed = true;
+      shake = Math.max(shake, 14);
+      noiseThud();
+      for(var d=0;d<8;d++){
+        bits.push({
+          x: wall.x - 10 + Math.random()*60, y: GROUND - Math.random()*14,
+          vx: (Math.random()-0.5)*160, vy: -40 - Math.random()*70,
+          rot:0, vr:0, s: 10+Math.random()*14, life: 0.5+Math.random()*0.4, smoke:true
+        });
+      }
+    }
+  }
 
   if(state === ST.TITLE){
     car.x = CAR_X; car.v = 140; spin += 140*dt;
@@ -362,54 +401,78 @@ function update(dt){
   if(state === ST.ROUND_READY) return;
 
   if(state === ST.ENTER){
+    // Standing start into round 1. Green: no points, but the run clock runs.
+    runTime += dt;
     car.enter = Math.min(1, car.enter + dt*1.8);
     var e = 1 - Math.pow(1-car.enter,3);
     car.x = -190 + (CAR_X+190)*e;
     car.v = CRUISE*e;
-    spin += car.v*dt;
-    if(car.enter >= 1){
-      leg.phase='yellow'; leg.t=0;
-      state = ST.MOVING; st = 0;
-    }
+    roll(car.v*dt);
+    if(car.enter >= 1){ openYellow(); }
+    return;
+  }
+
+  if(state === ST.GREEN){
+    // Rolling up to this round's light. GREEN PAYS NOTHING — it is pure
+    // dead weight on your average speed, which is what the bonus reads.
+    runTime += dt;
+    car.x = CAR_X;
+    car.v = CRUISE * Math.min(1, st/0.55);
+    roll(car.v*dt);
+    if(st >= GREEN_TIME){ openYellow(); }
     return;
   }
 
   if(state === ST.MOVING){
-    car.x = CAR_X; car.v = CRUISE;
+    runTime += dt;
+    car.x = CAR_X;
+    // the car winds up for as long as yellow lasts, so late seconds pay most
+    car.v = Math.min(MAX_SPEED, CRUISE + YELLOW_ACCEL*yellowTime);
     var moved = car.v*dt;
-    travel += moved; spin += moved;
+    roll(moved);
+    scoredTravel += moved;               // only yellow pixels are worth points
     roundPoints += moved*PPX;
+    score += moved*PPX;
 
-    leg.t += dt;
-    roundMovingTime += dt;
-    if(roundMovingTime >= roundThreshold){
-      crash(); return;
-    }
+    yellowTime += dt;
+    if(yellowTime >= yellowLimit){ turnRed(); }
+    return;
+  }
+
+  if(state === ST.RED){
+    // Light is red and the wall is down. The world keeps scrolling, so the
+    // wall closes on the bumper — no escape, just the last fraction of a second.
+    car.x = CAR_X;
+    var m2 = car.v*dt;
+    roll(m2);
+    wall.x -= m2;
+    if(wall.x <= car.x + CAR_LEN - 4){ crash(); }
     return;
   }
 
   if(state === ST.BRAKING){
-    car.visV = Math.max(0, car.visV - 900*dt);
-    spin += car.visV*dt;
-    if(car.visV <= 0){ state = ST.STOPPED; st = 0; }
+    // Braking from a wound-up car takes real seconds — all of it dead time
+    // dragging your average speed down. Another cost of the standing restart.
+    runTime += dt;
+    car.visV = Math.max(0, car.visV - BRAKE_DECEL*dt);
+    roll(car.visV*dt);
+    if(car.visV <= 0){ passRound(); }
     return;
   }
 
-  if(state === ST.STOPPED) return;
-
-  if(state === ST.RESOLVE_BANK){
-    if(st > 1.2) nextRound();
+  if(state === ST.RESOLVE_ROUND){
+    if(st > 1.4) nextRound();
     return;
   }
 
   if(state === ST.RESOLVE_CRASH){
     car.squash = Math.max(0, car.squash - dt*0.9);
     car.tilt = Math.max(0, car.tilt - dt*0.5);
-    if(st > 1.3){ state = ST.CRASHED; st = 0; }
+    if(st > 1.4){ state = ST.GAMEOVER; st = 0; }
     return;
   }
 
-  if(state === ST.CRASHED){
+  if(state === ST.GAMEOVER){
     car.squash = Math.max(0, car.squash - dt*0.7);
     car.tilt = Math.max(0, car.tilt - dt*0.4);
     return;
@@ -481,15 +544,15 @@ function drawGround(){
   ctx.fillStyle='#8E9AAC'; ctx.fillRect(0,ROAD_BOT+14,W,CONTROL_BAR_Y-(ROAD_BOT+14));
 }
 
-/* Points ruler: ticks scroll with world travel; each tick's number is
-   derived directly from the same points-per-pixel rate as scoring, so the
-   number under the car always matches Points This Round exactly.        */
+/* Distance ruler: driven by scoredTravel, the pixels covered while yellow is
+   up, so it advances only when points are actually being earned and freezes
+   the moment you brake. Its numbers are this round's distance points.    */
 function drawRuler(){
   if(state===ST.TITLE) return;
   var y = ROAD_BOT + 30;
   var pxPerTick = 25 / PPX;              // px between each 25-point mark
-  var off = travel % pxPerTick;
-  var baseVal = Math.round((travel - off) * PPX);
+  var off = scoredTravel % pxPerTick;
+  var baseVal = Math.round((scoredTravel - off) * PPX);
   ctx.strokeStyle = C.rulerDim; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   for(var x = -off, v = baseVal; x < W+40; x += pxPerTick, v += 25){
@@ -506,13 +569,17 @@ function drawControlBar(){
   ctx.beginPath(); ctx.moveTo(0,CONTROL_BAR_Y); ctx.lineTo(W,CONTROL_BAR_Y); ctx.stroke();
 }
 
+/* The wall slams down out of frame the instant the light goes red: it is drawn
+   at full size and translated in from above, so it reads as dropping. */
 function drawWall(){
   if(!wall.up || wall.rise <= 0) return;
   var x = wall.x - 6;
-  var full = 148;
+  var h = 148;
   var e = wall.rise, ease = 1 - Math.pow(1-e,3);
-  var h = full * (ease * (1 + 0.09*Math.sin(e*Math.PI)));
   var y = GROUND+8-h, w = 40;
+
+  ctx.save();
+  ctx.translate(0, -(1-ease)*(GROUND+140));
 
   ctx.fillStyle='#D9714F';
   ctx.beginPath();
@@ -537,6 +604,8 @@ function drawWall(){
   }
   ctx.restore();
   ctx.lineWidth=3.5; ctx.strokeStyle=C.ink; ctx.strokeRect(x,y,w,h);
+
+  ctx.restore();
 }
 
 function drawWheel(wx,wy){
@@ -599,7 +668,7 @@ function drawCar(){
     ctx.fillRect(x-70,base-4,70,6);
     ctx.fillRect(x+6,base-4,70,6);
   }
-  if(state===ST.MOVING && !car.dead){
+  if((state===ST.MOVING || state===ST.RED || state===ST.GREEN) && !car.dead){
     ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=3;
     for(var i=0;i<3;i++){
       var yy = base-30-i*14;
@@ -630,27 +699,39 @@ function drawBits(){
 
 /* ================= HUD ================= */
 function drawScoreboard(){
-  // Bank Account (left)
-  ctx.fillStyle='rgba(11,16,26,.68)'; rr(20,16,270,66,12); ctx.fill();
+  // Run score — every point you are carrying, and all of it at risk (left)
+  ctx.fillStyle='rgba(11,16,26,.68)'; rr(20,16,232,66,12); ctx.fill();
   ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
-  txt('YOUR BANK ACCOUNT', 34, 38, 12, '#9FB6D2', 'left', 2.5);
-  txtShadow(Math.round(shownBank)+' PTS', 34, 68, 28, '#FFFFFF', 'left', 1);
+  txt('RUN SCORE — ALL AT RISK', 34, 38, 12, '#9FB6D2', 'left', 2.5);
+  txtShadow(Math.round(shownScore)+' PTS', 34, 68, 26, runLost ? C.red : '#FFFFFF', 'left', 1);
 
-  // Points This Round (center)
-  ctx.fillStyle='rgba(11,16,26,.68)'; rr(310,16,270,66,12); ctx.fill();
+  // Distance earned in the round you are driving right now (center-left)
+  ctx.fillStyle='rgba(11,16,26,.68)'; rr(264,16,206,66,12); ctx.fill();
   ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
-  txt('POINTS THIS ROUND', 324, 38, 12, '#9FB6D2', 'left', 2.5);
-  var liveCol = (state===ST.MOVING) ? C.amber : '#9BE3FF';
-  txtShadow(String(Math.round(roundPoints))+' PTS', 324, 68, 28, liveCol, 'left', 1);
-  if(restarts > 0) txt('RESTARTS '+restarts, 490, 38, 11, 'rgba(255,255,255,.5)', 'left', 1.5);
+  txt('THIS ROUND', 278, 38, 12, '#9FB6D2', 'left', 2.5);
+  var liveCol = (state===ST.RED) ? C.red : ((state===ST.MOVING) ? C.amber : '#9BE3FF');
+  txtShadow(String(Math.round(roundPoints)), 278, 68, 26, liveCol, 'left', 1);
+  if(state===ST.GREEN || state===ST.ENTER){
+    txt('GREEN PAYS 0', 456, 38, 11, 'rgba(255,255,255,.45)', 'right', 1.5);
+  }
+
+  // Average speed across the run — this is what the end-of-run bonus pays on
+  var bonus = runLost ? 0 : speedBonusNow();
+  ctx.fillStyle='rgba(11,16,26,.68)'; rr(482,16,206,66,12); ctx.fill();
+  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
+  txt('SPEED BONUS', 496, 38, 12, '#9FB6D2', 'left', 2.5);
+  var bCol = bonus<=0 ? '#6C7C93' : (bonus < 300 ? '#FF8A6B' : C.gold);
+  txtShadow(String(bonus), 496, 68, 26, bCol, 'left', 1);
+  txt('AVG '+Math.round(avgSpeed()/4)+' MPH', 674, 38, 11, 'rgba(255,255,255,.55)', 'right', 1.5);
+  var frac = Math.max(0, Math.min(1, bonus/1200));
+  ctx.fillStyle='rgba(255,255,255,.10)'; rr(496,74,178,5,3); ctx.fill();
+  if(frac>0){ ctx.fillStyle=bCol; rr(496,74,178*frac,5,3); ctx.fill(); }
 
   // Round counter + pips (right)
   txt('ROUND '+Math.min(round+1,TOTAL_ROUNDS)+' / '+TOTAL_ROUNDS, W-20, 30, 13, 'rgba(255,255,255,.75)', 'right', 2);
-  var n=TOTAL_ROUNDS, pw=13, gap=4, totalW=n*pw+(n-1)*gap, sx=W-20-totalW;
+  var n=TOTAL_ROUNDS, pw=22, gap=5, totalW=n*pw+(n-1)*gap, sx=W-20-totalW;
   for(var i=0;i<n;i++){
-    var col='rgba(255,255,255,.35)';
-    if(results[i]==='bank') col=C.green;
-    else if(results[i]==='crash') col=C.red;
+    var col = results[i]==='clear' ? C.green : (runLost && i===round ? C.red : 'rgba(255,255,255,.30)');
     ctx.fillStyle=col; rr(sx+i*(pw+gap),40,pw,9,4); ctx.fill();
   }
 
@@ -660,16 +741,20 @@ function drawScoreboard(){
   ctx.fillStyle=C.boxA; rr(lx,ly,lw,lh,14); ctx.fill(); ink(3);
   var cx = lx+lw/2;
   var lamps = [
-    {y:ly+26, on: leg.phase==='red' || state===ST.RESOLVE_CRASH, col:C.red},
-    {y:ly+62, on: leg.phase==='yellow', col:C.amber},
-    {y:ly+98, on: leg.phase==='idle', col:C.green}
+    {y:ly+26, on: light==='red',    col:C.red},
+    {y:ly+62, on: light==='yellow', col:C.amber},
+    {y:ly+98, on: light==='green',  col:C.green}
   ];
   for(var k=0;k<3;k++){
     var L=lamps[k];
+    // red pulses hard, yellow breathes so its urgency reads without a timer
+    var pulse = 1;
+    if(L.on && light==='red')    pulse = 0.7+0.3*Math.abs(Math.sin(performance.now()/110));
+    if(L.on && light==='yellow') pulse = 0.8+0.2*Math.abs(Math.sin(performance.now()/300));
     if(L.on){
       var g = ctx.createRadialGradient(cx,L.y,2,cx,L.y,34);
       g.addColorStop(0,L.col); g.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.globalAlpha=0.55; ctx.fillStyle=g;
+      ctx.globalAlpha=0.55*pulse; ctx.fillStyle=g;
       ctx.beginPath(); ctx.arc(cx,L.y,34,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
     }
     ctx.fillStyle = L.on ? L.col : C.off;
@@ -680,6 +765,10 @@ function drawScoreboard(){
       ctx.beginPath(); ctx.arc(cx-4,L.y-4,3.6,0,6.2832); ctx.fill();
     }
   }
+
+  var word = light==='red' ? 'RED' : (light==='yellow' ? 'YELLOW' : 'GREEN');
+  var wcol = light==='red' ? C.red : (light==='yellow' ? C.amber : C.green);
+  txt(word, cx, ly+lh+20, 12, wcol, 'center', 2.5);
 }
 
 function drawFloats(){
@@ -704,32 +793,66 @@ function drawBtn(b,col,label,sub,dim){
   ctx.globalAlpha = 1;
 }
 
+/* One lamp per round: five lights, five rounds, no second chances. */
+function drawLightTrack(){
+  var y = CONTROL_BAR_Y + 34, x0 = 34, r = 11, gap = 34;
+  txt('LIGHTS', x0, y - 22, 12, '#7F91AC', 'left', 2.5);
+  for(var i=0;i<TOTAL_ROUNDS;i++){
+    var cx = x0 + r + i*gap, done = results[i]==='clear', live = (i === round);
+    var col = done ? C.green
+            : (live ? (light==='red'?C.red:(light==='yellow'?C.amber:C.green)) : C.off);
+    if(live && light!=='off'){
+      var g = ctx.createRadialGradient(cx,y,2,cx,y,22);
+      g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.globalAlpha=0.5; ctx.fillStyle=g;
+      ctx.beginPath(); ctx.arc(cx,y,22,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
+    }
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(cx,y,r,0,6.2832); ctx.fill();
+    ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.stroke();
+  }
+  txt('ROUND '+Math.min(round+1,TOTAL_ROUNDS)+' OF '+TOTAL_ROUNDS,
+      x0 + TOTAL_ROUNDS*gap + 12, y+5, 14, '#C9D8EC', 'left', 2);
+}
+
 function drawControls(){
   if(state === ST.ROUND_READY){
     drawBtn(BTN_BEGIN, C.green, 'BEGIN', 'SPACE');
-  } else if(state === ST.MOVING || state === ST.BRAKING || state === ST.STOPPED){
-    var movingNow = (state === ST.MOVING);
-    drawBtn(BTN_STOP, C.red,   'STOP', 'SPACE', !movingNow);
-    drawBtn(BTN_GO,   C.green, 'GO',   'SPACE', movingNow);
-    drawBtn(BTN_BANK, C.gold,  'BANK & NEXT', 'ENTER', movingNow);
+  } else if(state === ST.MOVING || state === ST.BRAKING || state === ST.RED || state === ST.GREEN){
+    drawBtn(BTN_STOP, C.red, 'STOP', 'SPACE', state !== ST.MOVING);
+  }
+  if(state !== ST.OVER && state !== ST.GAMEOVER) drawLightTrack();
+
+  // live speed readout — the number that makes holding yellow feel worth it
+  if(state===ST.MOVING || state===ST.RED || state===ST.BRAKING){
+    var mph = Math.round((state===ST.BRAKING ? car.visV : car.v) / 4);
+    txt('SPEED', W-34, CONTROL_BAR_Y+22, 12, '#7F91AC', 'right', 2.5);
+    txt(mph+' MPH', W-34, CONTROL_BAR_Y+50, 22, state===ST.MOVING?C.amber:'#9BE3FF', 'right', 1);
   }
 }
 
 function drawOverlays(){
   if(state === ST.TITLE){
     ctx.fillStyle='rgba(8,12,20,.42)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-310,90,620,340);
+    panel(W/2-310,90,620,354);
     txtShadow('CHICKEN', W/2, 178, 66, C.amber, 'center', 9);
     txt('A RISK-TAKING DRIVING GAME', W/2, 208, 14, '#9FB6D2', 'center', 4);
-    txt('The car drives itself. You choose STOP or GO.', W/2, 250, 17, '#E6EEF8', 'center', 0, 700);
-    txt('The longer it moves, the more points you earn —', W/2, 274, 17, '#E6EEF8', 'center', 0, 700);
-    txt('but at some unknown point, red comes and a wall', W/2, 298, 17, '#E6EEF8', 'center', 0, 700);
-    txt('slams down if you\u2019re still moving.', W/2, 322, 17, '#E6EEF8', 'center', 0, 700);
-    txt('Stop safely, then GO again for more or BANK what you have.', W/2, 352, 15, '#FFD9A6', 'center', 0, 700);
+    txt('FIVE ROUNDS, ONE LIGHT EACH. Yellow lasts an unknown time', W/2, 248, 17, '#E6EEF8', 'center', 0, 700);
+    txt('and the car accelerates the whole way through it — the further', W/2, 272, 17, '#E6EEF8', 'center', 0, 700);
+    txt('you get on yellow, the more you score. Green pays nothing.', W/2, 296, 17, '#E6EEF8', 'center', 0, 700);
+    txt('STOP on yellow to clear the round. Reach RED and the wall', W/2, 320, 17, '#FFB4B4', 'center', 0, 700);
+    txt('drops \u2014 every time \u2014 and the whole run is over.', W/2, 344, 17, '#FFB4B4', 'center', 0, 700);
+    txt('Clear all five and a SPEED BONUS pays on your average speed.', W/2, 376, 15, '#FFD9A6', 'center', 0, 700);
     var pulse = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
     ctx.globalAlpha=pulse;
-    txt('PRESS SPACE OR TAP TO START — 15 ROUNDS', W/2, 400, 18, C.green, 'center', 3);
+    txt('PRESS SPACE OR TAP TO START — 5 ROUNDS, NO RETRIES', W/2, 412, 18, C.green, 'center', 3);
     ctx.globalAlpha=1;
+    return;
+  }
+
+  if(state === ST.ROUND_READY){
+    txtShadow('ROUND '+(round+1), W/2, 168, 46, '#FFFFFF', 'center', 5);
+    txt('ONE LIGHT  ·  STOP ON YELLOW  ·  RED ENDS THE RUN', W/2, 200, 15, '#B9CBE2', 'center', 3);
     return;
   }
 
@@ -741,11 +864,11 @@ function drawOverlays(){
     return;
   }
 
-  if(banner && state === ST.RESOLVE_BANK){
-    var t = st, al = Math.min(1, t*5) * (t>0.8 ? Math.max(0,(1.2-t)/0.4) : 1);
+  if(banner && state === ST.RESOLVE_ROUND){
+    var t = st, al = Math.min(1, t*5) * (t>1.0 ? Math.max(0,(1.4-t)/0.4) : 1);
     ctx.globalAlpha=al;
     txtShadow(banner.big, W/2, 150, 46, banner.col, 'center', 5);
-    txt(banner.sub, W/2, 182, 18, '#E9F1FA', 'center', 3);
+    txt(banner.sub, W/2, 184, 17, '#E9F1FA', 'center', 2);
     ctx.globalAlpha=1;
   }
   if(banner && state === ST.RESOLVE_CRASH){
@@ -756,30 +879,41 @@ function drawOverlays(){
     ctx.globalAlpha=1;
   }
 
-  if(state === ST.CRASHED){
-    ctx.fillStyle='rgba(8,12,20,.52)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-300,150,600,268);
-    txtShadow('CRASHED', W/2, 220, 52, C.red, 'center', 5);
-    txt('This round\u2019s points are lost. Your bank is untouched.', W/2, 256, 16, '#C4D5EA', 'center', 0, 700);
-    txt('Take the round again, or move on to the next one.', W/2, 280, 16, '#C4D5EA', 'center', 0, 700);
-    drawBtn(BTN_RETRY, C.green, 'TRY AGAIN', 'ROUND '+(round+1)+' AGAIN');
-    drawBtn(BTN_NEXT, '#8FA3BF', 'MOVE ON', round+1<TOTAL_ROUNDS ? 'ROUND '+(round+2) : 'FINISH RUN');
-    txt('SPACE  TRY AGAIN   \u00B7   ENTER  MOVE ON   \u00B7   R  RESTART RUN',
-        W/2, 434, 12, 'rgba(255,255,255,.5)', 'center', 2.5);
+  if(state === ST.GAMEOVER){
+    ctx.fillStyle='rgba(8,12,20,.56)'; ctx.fillRect(0,0,W,H);
+    panel(W/2-300,140,600,286);
+    txtShadow('GAME OVER', W/2, 214, 54, C.red, 'center', 5);
+    txt('You held the yellow too long in round '+(round+1)+' of '+TOTAL_ROUNDS+'.', W/2, 252, 16, '#C4D5EA', 'center', 0, 700);
+    txt('Every point is gone. The run starts again from round 1.', W/2, 276, 16, '#C4D5EA', 'center', 0, 700);
+    txt('CLEARED '+results.length+' / '+TOTAL_ROUNDS+'   \u00B7   BEST RUN '+bestScore,
+        W/2, 318, 16, '#8FA3BF', 'center', 2.5);
+    var pg = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
+    ctx.globalAlpha=pg;
+    txt('PRESS SPACE OR TAP TO START OVER', W/2, 372, 19, C.green, 'center', 3);
+    ctx.globalAlpha=1;
+    txt('R  RESTART', W/2, 404, 12, 'rgba(255,255,255,.45)', 'center', 2.5);
     return;
   }
 
   if(state === ST.OVER){
     ctx.fillStyle='rgba(8,12,20,.5)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-290,110,580,330);
-    txtShadow('RUN COMPLETE', W/2, 182, 46, '#FFFFFF', 'center', 5);
-    txt('FINAL BANK', W/2, 222, 14, '#9FB6D2', 'center', 4);
-    txtShadow(String(bank), W/2, 288, 68, C.gold, 'center', 4);
-    txt('BANKED '+banksCount+'   \u00B7   CRASHED '+crashesCount+'   \u00B7   BEST '+bestBank,
-        W/2, 332, 16, '#B9CBE2', 'center', 2.5);
+    panel(W/2-300,96,600,368);
+    txtShadow('ALL FIVE CLEARED', W/2, 164, 40, '#FFFFFF', 'center', 4);
+    txt('FINAL SCORE', W/2, 202, 14, '#9FB6D2', 'center', 4);
+    txtShadow(String(finalTotal), W/2, 266, 64, C.gold, 'center', 4);
+
+    // the split, so the speed bonus reads as the payoff for pushing yellow
+    txt('DISTANCE', W/2-150, 306, 13, '#9FB6D2', 'center', 2.5);
+    txt(String(Math.round(score)), W/2-150, 336, 26, '#E6EEF8', 'center', 1);
+    txt('+', W/2, 332, 24, '#6C7C93', 'center', 1);
+    txt('SPEED BONUS', W/2+150, 306, 13, '#9FB6D2', 'center', 2.5);
+    txt(String(finalBonus), W/2+150, 336, 26, C.gold, 'center', 1);
+
+    txt('AVG '+Math.round(avgSpeed()/4)+' MPH OVER '+runTime.toFixed(1)+'S   \u00B7   BEST RUN '+bestScore,
+        W/2, 372, 14, '#B9CBE2', 'center', 2);
     var p2 = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
     ctx.globalAlpha=p2;
-    txt('PRESS SPACE OR TAP TO RUN AGAIN', W/2, 396, 18, C.green, 'center', 3);
+    txt('PRESS SPACE OR TAP TO RUN AGAIN', W/2, 420, 18, C.green, 'center', 3);
     ctx.globalAlpha=1;
   }
 }
@@ -811,8 +945,8 @@ function draw(){
 
 /* ================= loop ================= */
 car = {x:CAR_X, v:140, enter:1, dead:false, squash:0, tilt:0, visV:0};
-leg = {phase:'idle', t:0};
-wall = {up:false, rise:0, x:0};
+light = 'off';
+wall = {up:false, rise:0, x:0, landed:false};
 
 var last = performance.now();
 function loop(now){
