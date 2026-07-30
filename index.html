@@ -5,40 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>CHICKEN — Risk-Taking Driving Game</title>
 <style>
-  :root{ --amber:#FFC93C; }
+  :root{ --amber:#F5B942; }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{
     margin:0;
-    background: radial-gradient(1200px 700px at 50% -10%, #1D2A3E 0%, #0B0F18 70%);
+    background: radial-gradient(1100px 640px at 50% -8%, #2C2450 0%, #100C1E 65%);
     display:flex;align-items:center;justify-content:center;
     padding:16px;
-    font-family:"Trebuchet MS","Segoe UI",Verdana,sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     overflow:hidden;
   }
   .frame{ width:100%;max-width:1000px; }
   .screen{
-    position:relative;width:100%;aspect-ratio:960/650;border-radius:14px;overflow:hidden;
-    background:#7FD8F7;
-    box-shadow: 0 0 0 4px #0B0F18, 0 0 0 8px #2A3547, 0 18px 50px rgba(0,0,0,.55);
+    position:relative;width:100%;aspect-ratio:960/650;border-radius:12px;overflow:hidden;
+    background:#7DC3EC;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 0 0 5px #17132A, 0 20px 48px rgba(0,0,0,.55);
   }
   canvas{display:block;width:100%;height:100%}
   .hint{
-    margin:12px 2px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;
-    color:#7F91AC;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    margin:12px 2px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    color:#8D84A8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
   }
-  .hint b{color:#C9D8EC;font-weight:700}
+  .hint b{color:#E4DFF2;font-weight:700}
   .key{
     display:inline-block;padding:3px 9px;border-radius:5px;
-    background:#1B2434;border:1px solid #33415A;border-bottom-width:3px;
-    color:#DCE7F5;font-size:11px;letter-spacing:.1em;
+    background:#211A3A;border:1px solid #3E3564;
+    color:#E4DFF2;font-size:11px;letter-spacing:.06em;
   }
   button.mute{
-    background:#1B2434;border:1px solid #33415A;color:#8FA3BF;
-    border-radius:6px;padding:5px 10px;font:inherit;font-size:11px;
-    letter-spacing:.12em;cursor:pointer;text-transform:uppercase;
+    background:#211A3A;border:1px solid #3E3564;color:#8D84A8;
+    border-radius:5px;padding:5px 10px;font:inherit;font-size:11px;
+    letter-spacing:.08em;cursor:pointer;text-transform:uppercase;
   }
-  button.mute:hover{color:#DCE7F5;border-color:#4B5F80}
+  button.mute:hover{color:#E4DFF2;border-color:#5A4C8C}
   button.mute:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   @media (max-width:560px){ .hint{font-size:10px} }
 </style>
@@ -48,12 +48,14 @@
   <div class="screen"><canvas id="game" aria-label="Chicken driving game"></canvas></div>
   <div class="hint">
     <span>
-      <span class="key">Space</span> <b>Start / Stop on yellow</b> &nbsp;·&nbsp;
-      <b>5 rounds — one red ends the run</b> &nbsp;·&nbsp;
-      <span class="key">R</span> <b>Restart run</b>
+      <span class="key">Space</span> <b>Go / Stop</b> &nbsp;·&nbsp;
+      <span class="key">B</span> <b>Bank points</b> &nbsp;·&nbsp;
+      <b>1 practice + 5 trials</b> &nbsp;·&nbsp;
+      <span class="key">R</span> <b>Restart</b>
     </span>
     <span style="display:flex;gap:8px">
-      <button class="mute" id="restart" type="button">Restart run</button>
+      <button class="mute" id="csv" type="button">Download CSV</button>
+      <button class="mute" id="restart" type="button">Restart</button>
       <button class="mute" id="mute" type="button">Sound: On</button>
     </span>
   </div>
@@ -77,15 +79,15 @@ window.addEventListener('resize', resize);
 
 /* ================= palette ================= */
 var C = {
-  skyTop:'#4FC5F0', skyBot:'#C7EFFF', sun:'#FFE9A3',
-  hill:'#3FA95A', grass:'#5AC46B', grassDark:'#46A957',
-  road:'#3E4553', roadTop:'#5A6272', roadBot:'#272C37', dash:'#E8EEF6',
-  curbA:'#F2F5FA', curbB:'#E24B4B',
-  car:'#FF4757', carDark:'#C22239', carLite:'#FF8F98', glass:'#A9E7FF',
-  ink:'#171A21', boxA:'#252B37', boxB:'#161A23',
-  green:'#3EE07A', amber:'#FFC93C', red:'#FF3B3B', off:'#2A303C',
-  brick:'#C0563A', brickDark:'#8E3A24', mortar:'#E6D7C6', gold:'#FFD34D',
-  ruler:'#E9F1FA', rulerDim:'rgba(255,255,255,.55)'
+  skyTop:'#3E93D8', skyMid:'#7DC3EC', skyBot:'#DFF3F7', sun:'#FFF6D8',
+  hill:'#5E9A82', grass:'#5FBF6D', grassDark:'#3F9E52',
+  road:'#4A4E58', roadTop:'#63676F', roadBot:'#2E3138', dash:'#F5F5F0',
+  car:'#F0523B', carDark:'#B8331F', carLite:'#F58A6E', glass:'#6FA8D8',
+  glassLite:'#D9EEFA',
+  ink:'#1C1730', boxA:'#3A3468', boxB:'#221C3E',
+  green:'#3FCB80', amber:'#F5B942', red:'#F0473F', off:'#332C4C',
+  brick:'#D9714F', brickDark:'#9E4A31', mortar:'#F0DCC4', gold:'#FFCB4E',
+  ruler:'#F5ECD9', rulerDim:'rgba(255,255,255,.35)'
 };
 
 /* ================= audio ================= */
@@ -131,64 +133,35 @@ function noiseThud(){
 var HORIZON = 320, ROAD_TOP = 372, ROAD_BOT = 462, GROUND = 440;
 var CONTROL_BAR_Y = 552;   // everything below this is the dashboard, not the road scene
 var CAR_X = 210, CAR_LEN = 128;
-var CRUISE = 160;              // px/s the moment yellow opens
-var YELLOW_ACCEL = 85;         // px/s² — the car keeps winding up all through yellow
-var MAX_SPEED = 520;           // px/s ceiling
-var BRAKE_DECEL = 900;         // px/s² of the stopping glide
+var CRUISE = 210;          // px/s visual speed while moving (no speed control — on/off only)
+var EASE_RATE = 6;         // exponential ease for the visual glide between moving/stopped
 
-/* ================= scoring =================
-   ONE LIGHT = ONE ROUND. Five rounds make a run, and the wall ends it —
-   there is no bank to fall back on, you start again from round 1.
-
-   DISTANCE — the only points, and they are earned ONLY while the light is
-   yellow. Green pays nothing, braking pays nothing. The car accelerates
-   the whole time yellow is up, so each extra second is worth more than
-   the one before it.
-
-   SPEED BONUS — paid once, at the end of a clean five-round run, on the
-   average speed you held across the whole run. Every round costs the same
-   fixed dead time (the green roll-up, the brake, the standing start), so
-   the only way to raise that average is to push deeper into the yellow
-   and let the car wind up. Going further on yellow IS the fast line.   */
-var PPX = 0.25;                 // points per pixel of travel
-var TOTAL_ROUNDS = 5;           // five lights, five rounds
-
-var YELLOW_MIN = 1.8, YELLOW_MAX = 7.0;   // seconds of yellow, re-rolled per round
-var WALL_LEAD = 60;                       // px the wall drops ahead of the bumper
-var GREEN_TIME = 0.9;                     // seconds of green before yellow opens
-
-var SPEED_BONUS_RATE = 8;       // bonus points per px/s of average speed over CRUISE
+/* ================= scoring & timing =================
+   Points tick up on a fixed clock while the car is MOVING — that is the only
+   control the player has. Stopping earns nothing more but is always safe;
+   moving is worth more but risks the wall. Every trial re-rolls its own
+   green->yellow and yellow->red delays so the pattern can never be learned. */
+var POINT_STEP = 25, POINT_INTERVAL = 0.4;      // +25 pts every 0.4s of motion
+var YELLOW_MIN = 1, YELLOW_MAX = 4;              // seconds: trial start -> yellow
+var RED_MIN = 1, RED_MAX = 4;                    // seconds: yellow -> red/wall
+var TOTAL_TRIALS = 5;
+var PX_PER_TICK = CRUISE * POINT_INTERVAL;       // road scroll per point tick, for the ruler
 
 function randRange(a,b){ return a + Math.random()*(b-a); }
-function rollYellowTime(){
-  return randRange(YELLOW_MIN, YELLOW_MAX);
-}
-function avgSpeed(){
-  return runTime > 0.2 ? runDist/runTime : 0;
-}
-function speedBonusNow(){
-  return Math.max(0, Math.round((avgSpeed() - CRUISE) * SPEED_BONUS_RATE));
-}
 
 /* ================= state ================= */
 var ST = {
-  TITLE:0, ROUND_READY:1, ENTER:2, MOVING:3, BRAKING:4,
-  RED:5, RESOLVE_ROUND:6, RESOLVE_CRASH:7, GAMEOVER:8, OVER:9, GREEN:10
+  TITLE:0, PRACTICE_INTRO:1, PRACTICE_DONE:2, TRIAL_INTRO:3,
+  ACTIVE:4, RESOLVE:5, SUMMARY:6
 };
 var state = ST.TITLE, st = 0;
 
-var round = 0;                 // 0-indexed, 0..TOTAL_ROUNDS-1
-var score = 0, shownScore = 0; // distance points across the whole run
-var roundPoints = 0;           // distance points earned in the current round
-var scoredTravel = 0;          // px travelled while yellow this run (drives the ruler)
-var runTime = 0, runDist = 0;  // whole-run clock and odometer, for the speed bonus
-var finalBonus = 0, finalTotal = 0;
-var runLost = false;           // true once the wall has ended the run
-var yellowTime = 0, yellowLimit = 0;
-var results = [];              // 'clear' per round survived
-var bestScore = 0;
+var bankAccount = 0, crashCount = 0, trialIndex = 0;
+var trialLog = [];             // one row per real (non-practice) trial
+var bestBank = 0;
 
-var car, light, wall;          // light: 'off' | 'green' | 'yellow' | 'red'
+var trial = null;              // the trial currently running or just resolved
+var car, wall;
 var travel = 0, spin = 0, shake = 0, flash = 0, banner = null;
 var bits = [], floats = [], clouds = [];
 
@@ -196,121 +169,181 @@ for(var ci=0; ci<5; ci++){
   clouds.push({x: Math.random()*W, y: 60+Math.random()*140, s: 0.7+Math.random()*0.9, v: 6+Math.random()*10});
 }
 
-function newRoundReady(){
-  roundPoints = 0;
-  yellowTime = 0; yellowLimit = rollYellowTime();
-  car = {x:-190, v:0, enter:0, dead:false, squash:0, tilt:0, visV:0};
-  light = 'green';
+car = {x:CAR_X, visV:CRUISE, dead:false, squash:0, tilt:0};
+wall = {up:false, rise:0, x:0, landed:false};
+
+function curLight(){ return trial ? trial.light : 'off'; }
+
+/* ================= trial lifecycle ================= */
+function newTrial(isPractice){
+  var yellowAt = randRange(YELLOW_MIN, YELLOW_MAX);
+  var redAt = yellowAt + randRange(RED_MIN, RED_MAX);
+  trial = {
+    isPractice: isPractice,
+    number: isPractice ? 0 : trialIndex+1,
+    yellowAt: yellowAt, redAt: redAt,
+    elapsed: 0,
+    light: 'green',
+    moving: true,               // the car starts moving automatically
+    restarts: 0,
+    pointsThisRound: 0,
+    pointAccum: 0,
+    yellowTotalTime: 0,
+    yellowMotionTime: 0,
+    outcome: null,
+    finalPoints: 0,
+    lostPoints: 0
+  };
+  car = {x:CAR_X, visV:0, dead:false, squash:0, tilt:0};
   wall = {up:false, rise:0, x:0, landed:false};
-  banner = null; bits = [];
-  state = ST.ROUND_READY; st = 0;
+  travel = 0; banner = null;
 }
 
-/* A run is all five rounds. The wall wipes it — this is the only reset. */
-function startRun(){
-  round = 0; results = [];
-  score = 0; shownScore = 0; scoredTravel = 0;
-  runTime = 0; runDist = 0; runLost = false;
-  finalBonus = 0; finalTotal = 0;
-  newRoundReady();
+function startGame(){
+  bankAccount = 0; crashCount = 0; trialIndex = 0; trialLog = [];
+  state = ST.PRACTICE_INTRO; st = 0;
+  beep(660,0.09,'square',0.05);
 }
 
-function beginRound(){
-  if(state !== ST.ROUND_READY) return;
+function beginPracticeTrial(){
+  newTrial(true);
+  state = ST.ACTIVE; st = 0;
   beep(660,0.08,'square',0.05);
-  state = ST.ENTER; st = 0;
 }
 
-function pressStop(){
-  if(state !== ST.MOVING) return;
-  // Stopping while yellow is up is immediately safe: the hidden yellow timer
-  // is cancelled the instant the player commits. Only the visual glide runs on.
-  car.visV = car.v;
-  state = ST.BRAKING; st = 0;
-  beep(260,0.12,'sawtooth',0.05);
+function beginNextTrial(){
+  newTrial(false);
+  state = ST.ACTIVE; st = 0;
 }
 
-/* Stopped on yellow = round survived. Its distance points are already in the
-   score; the run rolls straight on to the next light. */
-function passRound(){
-  var pts = Math.round(roundPoints);
-  results.push('clear');
-  light = 'green';
-  banner = {big:'ROUND '+(round+1)+' CLEAR', sub:'+'+pts+' DISTANCE', col:C.green};
-  floats.push({x:car.x+CAR_LEN-20, y:GROUND-108, txt:'+'+pts, col:C.gold, life:1.0, vy:-40, size:26});
-  beep(880,0.09,'square',0.055);
-  setTimeout(function(){ beep(1180,0.11,'square',0.05); }, 85);
-  state = ST.RESOLVE_ROUND; st = 0;
+function toggleGoStop(){
+  if(state !== ST.ACTIVE || trial.outcome) return;
+  if(trial.moving){
+    trial.moving = false;
+    beep(260,0.12,'sawtooth',0.05);
+  } else {
+    trial.moving = true;
+    trial.restarts++;
+    beep(660,0.08,'square',0.05);
+  }
 }
 
-/* Five rounds survived. The speed bonus is settled here, on the average
-   speed held across the entire run. */
-function finishRun(){
-  finalBonus = speedBonusNow();
-  finalTotal = Math.round(score) + finalBonus;
-  bestScore = Math.max(bestScore, finalTotal);
-  state = ST.OVER; st = 0;
-  beep(660,0.12,'square',0.05);
-  setTimeout(function(){ beep(880,0.16,'square',0.05); }, 130);
-  setTimeout(function(){ beep(1180,0.20,'square',0.05); }, 260);
+function pressBank(){
+  if(state !== ST.ACTIVE || trial.outcome || trial.moving) return;
+  bankTrial();
 }
 
-/* Each of the five rounds gets its own independently rolled yellow window. */
-function openYellow(){
-  light = 'yellow';
-  yellowTime = 0; yellowLimit = rollYellowTime();
-  state = ST.MOVING; st = 0;
-  beep(520,0.08,'square',0.05);
-}
-
-/* The yellow window ran out. Red always drops the wall — there is no roll. */
-function turnRed(){
-  light = 'red';
-  // lead scales with speed so the wall always lands before you reach it
-  wall.x = car.x + CAR_LEN + Math.max(WALL_LEAD, car.v*0.28);
+function triggerRed(){
+  trial.light = 'red';
+  wall.x = car.x + CAR_LEN + 40;
   wall.up = true; wall.rise = 0; wall.landed = false;
   shake = Math.max(shake, 10);
   beep(180,0.20,'sawtooth',0.08);
-  state = ST.RED; st = 0;
+  if(trial.moving){ crashTrial(); } else { bankTrial(); }
 }
 
-/* The wall ends the run outright — everything goes, back to round 1. */
-function crash(){
-  var lost = Math.round(score) + speedBonusNow();
-  runLost = true;
-  car.dead = true; car.v = 0; car.squash = 1; car.tilt = 0.9;
-  shake = 26; flash = 1;
+function crashTrial(){
+  trial.outcome = 'crash';
+  trial.lostPoints = Math.round(trial.pointsThisRound);
+  trial.pointsThisRound = 0;
+  car.dead = true; car.visV = 0; car.squash = 1; car.tilt = 0.9;
+  shake = 12; flash = 1;
   noiseThud(); beep(120,0.35,'sawtooth',0.10);
-  banner = {big:'CRASH!', sub:'RAN THE RED IN ROUND '+(round+1)+' — RUN OVER', col:C.red};
-  floats.push({x:car.x+CAR_LEN-30, y:GROUND-118, txt:'-'+lost, col:'#FF7A7A', life:1.3, vy:-34, size:28});
-  score = 0; roundPoints = 0;
+  banner = {big:'CRASH!', sub:'LOST '+trial.lostPoints+' POINTS THIS TRIAL', col:C.red};
+  floats.push({x:car.x+CAR_LEN-30, y:GROUND-118, txt:'-'+trial.lostPoints, col:'#C9847E', life:1.3, vy:-34, size:28});
   spawnDebris(wall.x, true);
-  state = ST.RESOLVE_CRASH; st = 0;
+  finalizeTrial();
+  state = ST.RESOLVE; st = 0;
 }
 
-function nextRound(){
-  round++;
-  if(round >= TOTAL_ROUNDS) finishRun();
-  else newRoundReady();
+function bankTrial(){
+  trial.outcome = 'bank';
+  trial.finalPoints = Math.round(trial.pointsThisRound);
+  if(!trial.isPractice) bankAccount += trial.finalPoints;
+  banner = {big: trial.isPractice ? 'PRACTICE BANKED' : 'BANKED!', sub:'+'+trial.finalPoints+' POINTS SAVED', col:C.green};
+  floats.push({x:car.x+CAR_LEN-20, y:GROUND-108, txt:'+'+trial.finalPoints, col:C.gold, life:1.0, vy:-40, size:26});
+  beep(880,0.09,'square',0.055);
+  setTimeout(function(){ beep(1180,0.11,'square',0.05); }, 85);
+  finalizeTrial();
+  state = ST.RESOLVE; st = 0;
 }
+
+function finalizeTrial(){
+  var pct = trial.yellowTotalTime > 0
+    ? Math.round((trial.yellowMotionTime/trial.yellowTotalTime)*1000)/10
+    : null;
+  trial.pctMovingAfterYellow = pct;
+  if(!trial.isPractice){
+    trialIndex++;
+    if(trial.outcome === 'crash') crashCount++;
+    trialLog.push({
+      trial: trial.number,
+      outcome: trial.outcome,
+      pointsBanked: trial.finalPoints,
+      pointsLost: trial.lostPoints,
+      restarts: trial.restarts,
+      yellowDelaySec: Math.round(trial.yellowAt*100)/100,
+      redDelaySec: Math.round((trial.redAt-trial.yellowAt)*100)/100,
+      pctMovingAfterYellow: pct
+    });
+    bestBank = Math.max(bestBank, bankAccount);
+  }
+}
+
+function advanceAfterResolve(){
+  if(trial.isPractice){ state = ST.PRACTICE_DONE; st = 0; }
+  else if(trialIndex >= TOTAL_TRIALS){ state = ST.SUMMARY; st = 0; }
+  else { state = ST.TRIAL_INTRO; st = 0; trial = null; }
+}
+
+function resetAll(){
+  bankAccount = 0; crashCount = 0; trialIndex = 0; trialLog = [];
+  trial = null;
+  car = {x:CAR_X, visV:CRUISE, dead:false, squash:0, tilt:0};
+  wall = {up:false, rise:0, x:0, landed:false};
+  travel = 0; banner = null; bits = [];
+  state = ST.TITLE; st = 0;
+}
+
+/* ================= CSV export ================= */
+function exportCSV(){
+  if(trialLog.length === 0) return;
+  var header = ['trial','outcome','points_banked','points_lost','restarts','yellow_delay_sec','red_delay_sec','pct_time_moving_after_yellow'];
+  var rows = trialLog.map(function(r){
+    return [r.trial, r.outcome, r.pointsBanked, r.pointsLost, r.restarts,
+            r.yellowDelaySec, r.redDelaySec, r.pctMovingAfterYellow==null?'':r.pctMovingAfterYellow].join(',');
+  });
+  var csv = header.join(',') + '\n' + rows.join('\n') + '\n';
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'chicken-game-results.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('csv').addEventListener('click', function(){ exportCSV(); this.blur(); });
 
 /* ================= input ================= */
-var BTN_BEGIN  = {x: W/2-110, y: 578, w: 220, h: 56};
-var BTN_STOP   = {x: W/2-130, y: 578, w: 260, h: 56};
+var BTN_STOP = {x: W/2-110, y: 578, w: 220, h: 56};
+var BTN_GO   = {x: W/2-220, y: 578, w: 190, h: 56};
+var BTN_BANK = {x: W/2+30,  y: 578, w: 190, h: 56};
+var BTN_BEGIN = {x: W/2-110, y: 578, w: 220, h: 56};
 
 function hit(b, mx, my){ return mx>=b.x && mx<=b.x+b.w && my>=b.y && my<=b.y+b.h; }
-function atStartScreen(){ return state===ST.TITLE || state===ST.OVER || state===ST.GAMEOVER; }
 
 window.addEventListener('keydown', function(e){
   if(e.code === 'Space' || e.code === 'Enter'){
     e.preventDefault();
-    if(atStartScreen()){ beep(660,0.09,'square',0.05); startRun(); }
-    else if(state===ST.ROUND_READY){ beginRound(); }
-    else if(state===ST.MOVING){ pressStop(); }
+    if(state===ST.TITLE){ startGame(); }
+    else if(state===ST.PRACTICE_INTRO){ beginPracticeTrial(); }
+    else if(state===ST.PRACTICE_DONE){ state=ST.TRIAL_INTRO; st=0; trial=null; }
+    else if(state===ST.SUMMARY){ startGame(); }
+    else if(state===ST.ACTIVE){ toggleGoStop(); }
     return;
   }
   var k = e.key ? e.key.toLowerCase() : '';
-  if(k === 'r'){ e.preventDefault(); beep(500,0.09,'square',0.05); startRun(); }
+  if(k === 'b'){ e.preventDefault(); pressBank(); }
+  if(k === 'r'){ e.preventDefault(); beep(500,0.09,'square',0.05); resetAll(); }
 });
 
 cvs.addEventListener('pointerdown', function(e){
@@ -319,46 +352,51 @@ cvs.addEventListener('pointerdown', function(e){
   var mx = (e.clientX - r.left) * (W/r.width);
   var my = (e.clientY - r.top) * (H/r.height);
 
-  if(atStartScreen()){ beep(660,0.09,'square',0.05); startRun(); return; }
-  if(state === ST.ROUND_READY && hit(BTN_BEGIN, mx, my)){ beginRound(); return; }
-  if(state === ST.MOVING && hit(BTN_STOP, mx, my)){ pressStop(); return; }
+  if(state===ST.TITLE){ startGame(); return; }
+  if(state===ST.PRACTICE_INTRO && hit(BTN_BEGIN, mx, my)){ beginPracticeTrial(); return; }
+  if(state===ST.PRACTICE_DONE && hit(BTN_BEGIN, mx, my)){ state=ST.TRIAL_INTRO; st=0; trial=null; return; }
+  if(state===ST.SUMMARY){ startGame(); return; }
+  if(state===ST.ACTIVE){
+    if(trial.moving){ if(hit(BTN_STOP, mx, my)) toggleGoStop(); }
+    else {
+      if(hit(BTN_GO, mx, my)) toggleGoStop();
+      else if(hit(BTN_BANK, mx, my)) pressBank();
+    }
+  }
 });
 
 document.getElementById('restart').addEventListener('click', function(){
-  beep(500,0.09,'square',0.05); startRun(); this.blur();
+  beep(500,0.09,'square',0.05); resetAll(); this.blur();
 });
 
 /* ================= debris ================= */
 function spawnDebris(atX, big){
-  var n = big ? 26 : 10;
+  var n = big ? 18 : 8;
   for(var i=0;i<n;i++){
     bits.push({
-      x: atX + Math.random()*26, y: GROUND - Math.random()*140,
-      vx: 90 + Math.random()*300, vy: -180 - Math.random()*300,
-      rot: Math.random()*6, vr: (Math.random()-0.5)*14,
-      s: 10 + Math.random()*10, life: 1.4 + Math.random()*0.6, smoke:false
+      x: atX + Math.random()*26, y: GROUND - Math.random()*100,
+      vx: 50 + Math.random()*160, vy: -100 - Math.random()*160,
+      rot: Math.random()*6, vr: (Math.random()-0.5)*10,
+      s: 8 + Math.random()*8, life: 1.0 + Math.random()*0.4, smoke:false,
+      spark: Math.random()<0.35
     });
   }
   if(big){
-    for(var j=0;j<10;j++){
+    for(var j=0;j<5;j++){
       bits.push({
         x: atX - 20 + Math.random()*30, y: GROUND - 40 - Math.random()*50,
-        vx: -40 - Math.random()*90, vy: -70 - Math.random()*110,
-        rot:0, vr:0, s: 16+Math.random()*18, life: 0.9+Math.random()*0.5, smoke:true
+        vx: -30 - Math.random()*60, vy: -50 - Math.random()*80,
+        rot:0, vr:0, s: 14+Math.random()*14, life: 0.7+Math.random()*0.4, smoke:true
       });
     }
   }
 }
 
 /* ================= update ================= */
-/* Every pixel the car covers, in any phase, counts on the run odometer —
-   that plus the run clock is the average speed the bonus is paid on. */
-function roll(px){ travel += px; spin += px; runDist += px; }
+function roll(px){ travel += px; spin += px; }
 
 function update(dt){
   st += dt;
-  shownScore += (score - shownScore) * Math.min(1, dt*9);
-  if(Math.abs(score-shownScore) < 0.6) shownScore = score;
   shake = Math.max(0, shake - dt*46);
   flash = Math.max(0, flash - dt*2.6);
 
@@ -379,7 +417,7 @@ function update(dt){
   }
   if(wall.up && wall.rise < 1){
     wall.rise = Math.min(1, wall.rise + dt*9);
-    if(wall.rise >= 1 && !wall.landed){   // dust kicked up where it hits the road
+    if(wall.rise >= 1 && !wall.landed){
       wall.landed = true;
       shake = Math.max(shake, 14);
       noiseThud();
@@ -394,87 +432,57 @@ function update(dt){
   }
 
   if(state === ST.TITLE){
-    car.x = CAR_X; car.v = 140; spin += 140*dt;
+    car.x = CAR_X; car.visV = CRUISE; roll(CRUISE*dt);
     return;
   }
 
-  if(state === ST.ROUND_READY) return;
-
-  if(state === ST.ENTER){
-    // Standing start into round 1. Green: no points, but the run clock runs.
-    runTime += dt;
-    car.enter = Math.min(1, car.enter + dt*1.8);
-    var e = 1 - Math.pow(1-car.enter,3);
-    car.x = -190 + (CAR_X+190)*e;
-    car.v = CRUISE*e;
-    roll(car.v*dt);
-    if(car.enter >= 1){ openYellow(); }
+  if(state === ST.PRACTICE_INTRO || state === ST.PRACTICE_DONE || state === ST.SUMMARY){
     return;
   }
 
-  if(state === ST.GREEN){
-    // Rolling up to this round's light. GREEN PAYS NOTHING — it is pure
-    // dead weight on your average speed, which is what the bonus reads.
-    runTime += dt;
+  if(state === ST.TRIAL_INTRO){
+    if(st > 0.9){
+      if(trialIndex >= TOTAL_TRIALS){ state = ST.SUMMARY; st = 0; }
+      else beginNextTrial();
+    }
+    return;
+  }
+
+  if(state === ST.ACTIVE){
+    trial.elapsed += dt;
+
+    if(trial.moving){
+      trial.pointAccum += dt;
+      while(trial.pointAccum >= POINT_INTERVAL){
+        trial.pointAccum -= POINT_INTERVAL;
+        trial.pointsThisRound += POINT_STEP;
+      }
+    }
+
+    if(trial.light === 'green' && trial.elapsed >= trial.yellowAt){
+      trial.light = 'yellow';
+      beep(520,0.08,'square',0.05);
+    }
+    if(trial.light === 'yellow'){
+      trial.yellowTotalTime += dt;
+      if(trial.moving) trial.yellowMotionTime += dt;
+      if(trial.elapsed >= trial.redAt){ triggerRed(); }
+    }
+
     car.x = CAR_X;
-    car.v = CRUISE * Math.min(1, st/0.55);
-    roll(car.v*dt);
-    if(st >= GREEN_TIME){ openYellow(); }
-    return;
-  }
-
-  if(state === ST.MOVING){
-    runTime += dt;
-    car.x = CAR_X;
-    // the car winds up for as long as yellow lasts, so late seconds pay most
-    car.v = Math.min(MAX_SPEED, CRUISE + YELLOW_ACCEL*yellowTime);
-    var moved = car.v*dt;
-    roll(moved);
-    scoredTravel += moved;               // only yellow pixels are worth points
-    roundPoints += moved*PPX;
-    score += moved*PPX;
-
-    yellowTime += dt;
-    if(yellowTime >= yellowLimit){ turnRed(); }
-    return;
-  }
-
-  if(state === ST.RED){
-    // Light is red and the wall is down. The world keeps scrolling, so the
-    // wall closes on the bumper — no escape, just the last fraction of a second.
-    car.x = CAR_X;
-    var m2 = car.v*dt;
-    roll(m2);
-    wall.x -= m2;
-    if(wall.x <= car.x + CAR_LEN - 4){ crash(); }
-    return;
-  }
-
-  if(state === ST.BRAKING){
-    // Braking from a wound-up car takes real seconds — all of it dead time
-    // dragging your average speed down. Another cost of the standing restart.
-    runTime += dt;
-    car.visV = Math.max(0, car.visV - BRAKE_DECEL*dt);
+    var target = trial.moving ? CRUISE : 0;
+    car.visV += (target - car.visV) * Math.min(1, dt*EASE_RATE);
+    if(Math.abs(car.visV-target) < 0.5) car.visV = target;
     roll(car.visV*dt);
-    if(car.visV <= 0){ passRound(); }
     return;
   }
 
-  if(state === ST.RESOLVE_ROUND){
-    if(st > 1.4) nextRound();
-    return;
-  }
-
-  if(state === ST.RESOLVE_CRASH){
-    car.squash = Math.max(0, car.squash - dt*0.9);
-    car.tilt = Math.max(0, car.tilt - dt*0.5);
-    if(st > 1.4){ state = ST.GAMEOVER; st = 0; }
-    return;
-  }
-
-  if(state === ST.GAMEOVER){
-    car.squash = Math.max(0, car.squash - dt*0.7);
-    car.tilt = Math.max(0, car.tilt - dt*0.4);
+  if(state === ST.RESOLVE){
+    if(trial.outcome === 'crash'){
+      car.squash = Math.max(0, car.squash - dt*0.8);
+      car.tilt = Math.max(0, car.tilt - dt*0.45);
+    }
+    if(st > (trial.outcome === 'crash' ? 1.4 : 1.1)){ advanceAfterResolve(); }
     return;
   }
 }
@@ -486,76 +494,85 @@ function rr(x,y,w,h,r){
   ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
 }
-function ink(w){ ctx.lineWidth=w||3; ctx.strokeStyle=C.ink; ctx.stroke(); }
+function ink(w){ ctx.lineWidth=w||1.5; ctx.strokeStyle=C.ink; ctx.stroke(); }
+var FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
 function txt(s,x,y,size,col,align,ls,weight){
   ctx.save();
-  ctx.font = (weight||900)+' '+size+'px "Trebuchet MS","Segoe UI",Verdana,sans-serif';
-  if('letterSpacing' in ctx) ctx.letterSpacing = (ls==null?2:ls)+'px';
+  ctx.font = (weight||700)+' '+size+'px '+FONT;
+  if('letterSpacing' in ctx) ctx.letterSpacing = (ls==null?0.5:ls)+'px';
   ctx.textAlign = align||'left'; ctx.textBaseline='alphabetic';
   ctx.fillStyle = col; ctx.fillText(s,x,y);
   ctx.restore();
 }
+/* Soft, single-pass shadow (blur, not an offset double-draw) for headline
+   moments only — titles, banners, big numbers. Keeps everyday labels flat. */
 function txtShadow(s,x,y,size,col,align,ls){
-  txt(s,x+3,y+3,size,'rgba(10,14,22,.4)',align,ls);
+  ctx.save();
+  ctx.shadowColor = 'rgba(10,6,24,.5)';
+  ctx.shadowBlur = size*0.28;
+  ctx.shadowOffsetY = size*0.06;
   txt(s,x,y,size,col,align,ls);
+  ctx.restore();
 }
 
 /* ================= scene ================= */
 function drawSky(){
   var g = ctx.createLinearGradient(0,0,0,HORIZON);
-  g.addColorStop(0,C.skyTop); g.addColorStop(1,C.skyBot);
+  g.addColorStop(0,C.skyTop); g.addColorStop(0.55,C.skyMid); g.addColorStop(1,C.skyBot);
   ctx.fillStyle=g; ctx.fillRect(0,0,W,HORIZON+2);
-  ctx.fillStyle=C.sun; ctx.globalAlpha=.85;
-  ctx.beginPath(); ctx.arc(816,80,40,0,6.2832); ctx.fill();
-  ctx.globalAlpha=.25; ctx.beginPath(); ctx.arc(816,80,60,0,6.2832); ctx.fill();
-  ctx.globalAlpha=1;
+
+  var sun = ctx.createRadialGradient(770,70,4,770,70,140);
+  sun.addColorStop(0,'rgba(255,252,232,.95)');
+  sun.addColorStop(0.4,'rgba(255,246,216,.4)');
+  sun.addColorStop(1,'rgba(255,246,216,0)');
+  ctx.fillStyle=sun; ctx.fillRect(0,0,W,HORIZON+2);
+
   ctx.fillStyle='rgba(255,255,255,.9)';
   for(var i=0;i<clouds.length;i++){
     var c=clouds[i], s=c.s;
+    ctx.globalAlpha=0.85;
     ctx.beginPath();
-    ctx.arc(c.x,c.y,18*s,0,6.2832);
-    ctx.arc(c.x+24*s,c.y-9*s,23*s,0,6.2832);
-    ctx.arc(c.x+52*s,c.y,18*s,0,6.2832);
-    ctx.rect(c.x,c.y-2,52*s,18*s);
+    ctx.arc(c.x,c.y,15*s,0,6.2832);
+    ctx.arc(c.x+18*s,c.y-7*s,18*s,0,6.2832);
+    ctx.arc(c.x+40*s,c.y,15*s,0,6.2832);
+    rr(c.x,c.y-1,40*s,15*s,7*s);
     ctx.fill();
   }
+  ctx.globalAlpha=1;
 }
 function drawGround(){
   ctx.fillStyle=C.hill;
-  ctx.beginPath();
-  ctx.moveTo(0,HORIZON);
-  ctx.quadraticCurveTo(150,HORIZON-40,300,HORIZON);
-  ctx.quadraticCurveTo(470,HORIZON-50,660,HORIZON);
-  ctx.quadraticCurveTo(830,HORIZON-36,960,HORIZON);
-  ctx.lineTo(960,HORIZON+4); ctx.lineTo(0,HORIZON+4);
-  ctx.closePath(); ctx.fill();
+  ctx.fillRect(0,HORIZON-6,W,10);
 
-  ctx.fillStyle=C.grass; ctx.fillRect(0,HORIZON,W,ROAD_TOP-HORIZON);
-  ctx.fillStyle=C.grassDark; ctx.fillRect(0,ROAD_TOP-7,W,7);
+  var gg = ctx.createLinearGradient(0,HORIZON,0,ROAD_TOP);
+  gg.addColorStop(0,C.grass); gg.addColorStop(1,C.grassDark);
+  ctx.fillStyle=gg; ctx.fillRect(0,HORIZON,W,ROAD_TOP-HORIZON);
 
-  ctx.fillStyle=C.roadTop; ctx.fillRect(0,ROAD_TOP,W,9);
-  ctx.fillStyle=C.road; ctx.fillRect(0,ROAD_TOP+9,W,ROAD_BOT-ROAD_TOP-9);
-  ctx.fillStyle=C.roadBot; ctx.fillRect(0,ROAD_BOT,W,14);
+  var rg = ctx.createLinearGradient(0,ROAD_TOP,0,ROAD_BOT);
+  rg.addColorStop(0,C.roadTop); rg.addColorStop(0.35,C.road); rg.addColorStop(1,C.roadBot);
+  ctx.fillStyle=rg; ctx.fillRect(0,ROAD_TOP,W,ROAD_BOT-ROAD_TOP);
 
   var off = travel % 120;
-  ctx.fillStyle=C.dash;
+  ctx.fillStyle=C.dash; ctx.globalAlpha=0.85;
   for(var x=-130;x<W+130;x+=120) ctx.fillRect(x-off,450,60,6);
+  ctx.globalAlpha=1;
 
-  ctx.fillStyle='#8E9AAC'; ctx.fillRect(0,ROAD_BOT+14,W,CONTROL_BAR_Y-(ROAD_BOT+14));
+  var bg = ctx.createLinearGradient(0,ROAD_BOT,0,CONTROL_BAR_Y);
+  bg.addColorStop(0,'#8C9199'); bg.addColorStop(1,'#6E737B');
+  ctx.fillStyle=bg; ctx.fillRect(0,ROAD_BOT,W,CONTROL_BAR_Y-ROAD_BOT);
 }
 
-/* Distance ruler: driven by scoredTravel, the pixels covered while yellow is
-   up, so it advances only when points are actually being earned and freezes
-   the moment you brake. Its numbers are this round's distance points.    */
+/* Distance ruler: markers tick up 25, 50, 75, 100... in step with the points
+   counter, since both are driven by the same moving flag and clock.        */
 function drawRuler(){
-  if(state===ST.TITLE) return;
+  if(!trial) return;
   var y = ROAD_BOT + 30;
-  var pxPerTick = 25 / PPX;              // px between each 25-point mark
-  var off = scoredTravel % pxPerTick;
-  var baseVal = Math.round((scoredTravel - off) * PPX);
+  var pxPerTick = PX_PER_TICK;
+  var off = travel % pxPerTick;
+  var baseVal = Math.round((travel-off)/pxPerTick) * POINT_STEP;
   ctx.strokeStyle = C.rulerDim; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
-  for(var x = -off, v = baseVal; x < W+40; x += pxPerTick, v += 25){
+  for(var x = -off, v = baseVal; x < W+40; x += pxPerTick, v += POINT_STEP){
     ctx.strokeStyle = C.rulerDim;
     ctx.beginPath(); ctx.moveTo(x,y-9); ctx.lineTo(x,y+9); ctx.stroke();
     if(v >= 0) txt(String(v), x, y+26, 13, C.ruler, 'center', 1, 700);
@@ -563,14 +580,14 @@ function drawRuler(){
 }
 
 function drawControlBar(){
-  ctx.fillStyle = 'rgba(11,16,26,.92)';
+  var bg = ctx.createLinearGradient(0,CONTROL_BAR_Y,0,H);
+  bg.addColorStop(0,'#1C1734'); bg.addColorStop(1,'#130F26');
+  ctx.fillStyle = bg;
   ctx.fillRect(0, CONTROL_BAR_Y, W, H-CONTROL_BAR_Y);
-  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(0,CONTROL_BAR_Y); ctx.lineTo(W,CONTROL_BAR_Y); ctx.stroke();
 }
 
-/* The wall slams down out of frame the instant the light goes red: it is drawn
-   at full size and translated in from above, so it reads as dropping. */
 function drawWall(){
   if(!wall.up || wall.rise <= 0) return;
   var x = wall.x - 6;
@@ -580,45 +597,32 @@ function drawWall(){
 
   ctx.save();
   ctx.translate(0, -(1-ease)*(GROUND+140));
+  ctx.shadowColor='rgba(10,6,24,.4)'; ctx.shadowBlur=14; ctx.shadowOffsetY=6;
 
-  ctx.fillStyle='#D9714F';
-  ctx.beginPath();
-  ctx.moveTo(x,y); ctx.lineTo(x+16,y-12); ctx.lineTo(x+w+16,y-12); ctx.lineTo(x+w,y);
-  ctx.closePath(); ctx.fill(); ink(3);
+  var wg = ctx.createLinearGradient(x,0,x+w,0);
+  wg.addColorStop(0,C.brick); wg.addColorStop(0.7,C.brick); wg.addColorStop(1,C.brickDark);
+  ctx.fillStyle=wg; ctx.fillRect(x,y,w,h);
+  ctx.shadowColor='transparent';
 
-  ctx.fillStyle=C.brickDark;
-  ctx.beginPath();
-  ctx.moveTo(x+w,y); ctx.lineTo(x+w+16,y-12); ctx.lineTo(x+w+16,GROUND-4); ctx.lineTo(x+w,GROUND+8);
-  ctx.closePath(); ctx.fill(); ink(3);
-
-  ctx.fillStyle=C.brick; ctx.fillRect(x,y,w,h);
   ctx.save();
   ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
-  ctx.strokeStyle=C.mortar; ctx.lineWidth=2.5;
-  var row=0;
+  ctx.strokeStyle=C.mortar; ctx.lineWidth=1.5; ctx.globalAlpha=0.55;
   for(var yy=GROUND+8; yy>y-20; yy-=17){
     ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke();
-    var ox=(row%2===0)?w/2:0;
-    ctx.beginPath(); ctx.moveTo(x+ox,yy); ctx.lineTo(x+ox,yy-17); ctx.stroke();
-    row++;
   }
+  ctx.globalAlpha=1;
   ctx.restore();
-  ctx.lineWidth=3.5; ctx.strokeStyle=C.ink; ctx.strokeRect(x,y,w,h);
+  ctx.lineWidth=2; ctx.strokeStyle=C.brickDark; ctx.strokeRect(x,y,w,h);
 
   ctx.restore();
 }
 
 function drawWheel(wx,wy){
-  var rot = spin/14;
   ctx.save(); ctx.translate(wx,wy);
-  ctx.fillStyle='#20242D'; ctx.beginPath(); ctx.arc(0,0,15,0,6.2832); ctx.fill(); ink(3);
-  ctx.rotate(rot);
-  ctx.fillStyle='#E8EEF6'; ctx.beginPath(); ctx.arc(0,0,7.5,0,6.2832); ctx.fill();
-  ctx.strokeStyle='#98A4B5'; ctx.lineWidth=2.5;
-  for(var i=0;i<3;i++){
-    var a=i*2.094;
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*7,Math.sin(a)*7); ctx.stroke();
-  }
+  ctx.fillStyle='#18161F'; ctx.beginPath(); ctx.arc(0,0,15,0,6.2832); ctx.fill(); ink(1.5);
+  ctx.fillStyle='rgba(255,255,255,.10)';
+  ctx.beginPath(); ctx.arc(-4,-4,8,0,6.2832); ctx.fill();
+  ctx.fillStyle='#5A5F72'; ctx.beginPath(); ctx.arc(0,0,5,0,6.2832); ctx.fill();
   ctx.restore();
 }
 
@@ -627,54 +631,47 @@ function drawCar(){
   ctx.save(); ctx.translate(x,base);
   if(car.squash > 0){
     ctx.translate(CAR_LEN*0.5,0);
-    ctx.scale(1-0.16*car.squash, 1+0.10*car.squash);
-    ctx.rotate(-0.10*car.tilt);
+    ctx.scale(1-0.05*car.squash, 1);
+    ctx.rotate(-0.03*car.tilt);
     ctx.translate(-CAR_LEN*0.5,0);
   }
-  ctx.fillStyle='rgba(12,18,28,.28)';
-  ctx.beginPath(); ctx.ellipse(CAR_LEN/2,6,74,10,0,0,6.2832); ctx.fill();
+  ctx.fillStyle='rgba(10,6,20,.30)';
+  ctx.beginPath(); ctx.ellipse(CAR_LEN/2,7,76,10,0,0,6.2832); ctx.fill();
 
   drawWheel(30,-14); drawWheel(106,-14);
 
-  ctx.fillStyle=C.car;
+  var bodyG = ctx.createLinearGradient(0,-70,0,-20);
+  bodyG.addColorStop(0,C.carLite); bodyG.addColorStop(0.45,C.car); bodyG.addColorStop(1,C.carDark);
+
+  ctx.fillStyle=bodyG;
   ctx.beginPath();
   ctx.moveTo(30,-42); ctx.lineTo(48,-70); ctx.lineTo(96,-70); ctx.lineTo(112,-42);
-  ctx.closePath(); ctx.fill(); ink(3.5);
+  ctx.closePath(); ctx.fill(); ink(1.5);
 
-  ctx.fillStyle=C.glass;
+  var glassG = ctx.createLinearGradient(44,-64,104,-46);
+  glassG.addColorStop(0,C.glassLite); glassG.addColorStop(0.5,C.glass); glassG.addColorStop(1,C.glass);
+  ctx.fillStyle=glassG;
   ctx.beginPath();
   ctx.moveTo(44,-46); ctx.lineTo(56,-64); ctx.lineTo(76,-64); ctx.lineTo(76,-46);
-  ctx.closePath(); ctx.fill(); ink(2.5);
-  ctx.fillStyle=C.glass;
+  ctx.closePath(); ctx.fill();
   ctx.beginPath();
   ctx.moveTo(82,-46); ctx.lineTo(82,-64); ctx.lineTo(92,-64); ctx.lineTo(104,-46);
-  ctx.closePath(); ctx.fill(); ink(2.5);
+  ctx.closePath(); ctx.fill();
 
-  ctx.fillStyle=C.car; rr(0,-44,CAR_LEN,32,9); ctx.fill(); ink(3.5);
-  ctx.fillStyle=C.carDark; rr(4,-22,CAR_LEN-8,9,4); ctx.fill();
-  ctx.fillStyle=C.carLite; rr(10,-41,CAR_LEN-24,6,3); ctx.fill();
+  ctx.fillStyle=bodyG; rr(0,-44,CAR_LEN,32,7); ctx.fill(); ink(1.5);
+  ctx.fillStyle=C.carDark; ctx.globalAlpha=0.5; rr(4,-22,CAR_LEN-8,8,3); ctx.fill(); ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(255,255,255,.22)'; rr(8,-41,CAR_LEN-24,4,2); ctx.fill();
 
-  ctx.fillStyle='#FFE96B'; rr(CAR_LEN-12,-38,12,10,3); ctx.fill(); ink(2.5);
-  ctx.fillStyle='#FF9A3C'; rr(0,-38,10,10,3); ctx.fill(); ink(2.5);
-  if((state===ST.BRAKING) && !car.dead){
-    ctx.fillStyle='#FF3B3B'; rr(-1,-38,11,10,3); ctx.fill();
-    ctx.globalAlpha=.4; ctx.fillStyle='#FF3B3B';
-    ctx.beginPath(); ctx.arc(2,-33,16,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
-  }
+  var stopped = trial && !trial.moving && state===ST.ACTIVE && !car.dead;
+  ctx.fillStyle = stopped ? C.red : '#DDBE4E';
+  rr(-1,-38,10,9,2); ctx.fill();
+  ctx.fillStyle='#F0DCC4'; rr(CAR_LEN-11,-38,12,9,2); ctx.fill();
   ctx.restore();
 
-  if(state===ST.BRAKING && car.visV > 8){
-    ctx.fillStyle='rgba(20,24,32,.28)';
-    ctx.fillRect(x-70,base-4,70,6);
-    ctx.fillRect(x+6,base-4,70,6);
-  }
-  if((state===ST.MOVING || state===ST.RED || state===ST.GREEN) && !car.dead){
-    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=3;
-    for(var i=0;i<3;i++){
-      var yy = base-30-i*14;
-      var len = 22 + ((spin*3 + i*40) % 26);
-      ctx.beginPath(); ctx.moveTo(x-16-len,yy); ctx.lineTo(x-16,yy); ctx.stroke();
-    }
+  if(stopped && car.visV > 8){
+    ctx.fillStyle='rgba(10,6,20,.22)';
+    ctx.fillRect(x-70,base-4,70,5);
+    ctx.fillRect(x+6,base-4,70,5);
   }
 }
 
@@ -683,14 +680,14 @@ function drawBits(){
     var p=bits[i];
     ctx.save(); ctx.translate(p.x,p.y);
     if(p.smoke){
-      ctx.globalAlpha=Math.max(0,p.life*0.5);
-      ctx.fillStyle='#C9CFD9';
+      ctx.globalAlpha=Math.max(0,p.life*0.4);
+      ctx.fillStyle='#E8E4DC';
       ctx.beginPath(); ctx.arc(0,0,p.s,0,6.2832); ctx.fill();
     } else {
       ctx.rotate(p.rot);
       ctx.globalAlpha=Math.min(1,p.life);
-      ctx.fillStyle=C.brick; ctx.fillRect(-p.s/2,-p.s/3,p.s,p.s*0.66);
-      ctx.lineWidth=2; ctx.strokeStyle=C.brickDark; ctx.strokeRect(-p.s/2,-p.s/3,p.s,p.s*0.66);
+      ctx.fillStyle=p.spark?C.gold:C.brick; ctx.fillRect(-p.s/2,-p.s/3,p.s,p.s*0.66);
+      ctx.lineWidth=1; ctx.strokeStyle=p.spark?C.brickDark:C.brickDark; ctx.strokeRect(-p.s/2,-p.s/3,p.s,p.s*0.66);
     }
     ctx.restore();
   }
@@ -698,47 +695,40 @@ function drawBits(){
 }
 
 /* ================= HUD ================= */
+function hudCard(x,y,w,h){
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=10; ctx.shadowOffsetY=3;
+  ctx.fillStyle='rgba(20,15,40,.72)'; rr(x,y,w,h,10); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth=1.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x+10,y+1.5); ctx.lineTo(x+w-10,y+1.5); ctx.stroke();
+}
+
 function drawScoreboard(){
-  // Run score — every point you are carrying, and all of it at risk (left)
-  ctx.fillStyle='rgba(11,16,26,.68)'; rr(20,16,232,66,12); ctx.fill();
-  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
-  txt('RUN SCORE — ALL AT RISK', 34, 38, 12, '#9FB6D2', 'left', 2.5);
-  txtShadow(Math.round(shownScore)+' PTS', 34, 68, 26, runLost ? C.red : '#FFFFFF', 'left', 1);
+  var pts = trial ? Math.round(trial.pointsThisRound) : 0;
 
-  // Distance earned in the round you are driving right now (center-left)
-  ctx.fillStyle='rgba(11,16,26,.68)'; rr(264,16,206,66,12); ctx.fill();
-  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
-  txt('THIS ROUND', 278, 38, 12, '#9FB6D2', 'left', 2.5);
-  var liveCol = (state===ST.RED) ? C.red : ((state===ST.MOVING) ? C.amber : '#9BE3FF');
-  txtShadow(String(Math.round(roundPoints)), 278, 68, 26, liveCol, 'left', 1);
-  if(state===ST.GREEN || state===ST.ENTER){
-    txt('GREEN PAYS 0', 456, 38, 11, 'rgba(255,255,255,.45)', 'right', 1.5);
-  }
+  // Bank Account — points already banked, safe forever
+  hudCard(20,16,232,66);
+  txt('BANK ACCOUNT', 34, 38, 12, '#B6A8DC', 'left', 1.5);
+  txtShadow(bankAccount+' PTS', 34, 68, 26, C.gold, 'left', 0.5);
 
-  // Average speed across the run — this is what the end-of-run bonus pays on
-  var bonus = runLost ? 0 : speedBonusNow();
-  ctx.fillStyle='rgba(11,16,26,.68)'; rr(482,16,206,66,12); ctx.fill();
-  ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
-  txt('SPEED BONUS', 496, 38, 12, '#9FB6D2', 'left', 2.5);
-  var bCol = bonus<=0 ? '#6C7C93' : (bonus < 300 ? '#FF8A6B' : C.gold);
-  txtShadow(String(bonus), 496, 68, 26, bCol, 'left', 1);
-  txt('AVG '+Math.round(avgSpeed()/4)+' MPH', 674, 38, 11, 'rgba(255,255,255,.55)', 'right', 1.5);
-  var frac = Math.max(0, Math.min(1, bonus/1200));
-  ctx.fillStyle='rgba(255,255,255,.10)'; rr(496,74,178,5,3); ctx.fill();
-  if(frac>0){ ctx.fillStyle=bCol; rr(496,74,178*frac,5,3); ctx.fill(); }
+  // Points This Round — live, all at risk until banked
+  hudCard(264,16,206,66);
+  txt('POINTS THIS ROUND', 278, 38, 12, '#B6A8DC', 'left', 1.5);
+  var light = curLight();
+  var liveCol = (light==='red') ? C.red : (trial && trial.moving ? C.amber : '#9AA6D8');
+  txtShadow(String(pts), 278, 68, 26, liveCol, 'left', 0.5);
 
-  // Round counter + pips (right)
-  txt('ROUND '+Math.min(round+1,TOTAL_ROUNDS)+' / '+TOTAL_ROUNDS, W-20, 30, 13, 'rgba(255,255,255,.75)', 'right', 2);
-  var n=TOTAL_ROUNDS, pw=22, gap=5, totalW=n*pw+(n-1)*gap, sx=W-20-totalW;
-  for(var i=0;i<n;i++){
-    var col = results[i]==='clear' ? C.green : (runLost && i===round ? C.red : 'rgba(255,255,255,.30)');
-    ctx.fillStyle=col; rr(sx+i*(pw+gap),40,pw,9,4); ctx.fill();
-  }
-
-  // fixed traffic-light HUD panel — a status indicator, not a roadside object
-  var lx = W-84, ly = 58, lw = 62, lh = 118;
-  ctx.fillStyle=C.boxB; rr(lx+6,ly+6,lw,lh,14); ctx.fill();
-  ctx.fillStyle=C.boxA; rr(lx,ly,lw,lh,14); ctx.fill(); ink(3);
+  // traffic light HUD panel
+  var lx = W-104, ly = 16, lw = 62, lh = 118;
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=10; ctx.shadowOffsetY=3;
+  var boxG = ctx.createLinearGradient(lx,ly,lx,ly+lh);
+  boxG.addColorStop(0,C.boxA); boxG.addColorStop(1,C.boxB);
+  ctx.fillStyle=boxG; rr(lx,ly,lw,lh,10); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth=1.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
   var cx = lx+lw/2;
   var lamps = [
     {y:ly+26, on: light==='red',    col:C.red},
@@ -747,173 +737,186 @@ function drawScoreboard(){
   ];
   for(var k=0;k<3;k++){
     var L=lamps[k];
-    // red pulses hard, yellow breathes so its urgency reads without a timer
-    var pulse = 1;
-    if(L.on && light==='red')    pulse = 0.7+0.3*Math.abs(Math.sin(performance.now()/110));
-    if(L.on && light==='yellow') pulse = 0.8+0.2*Math.abs(Math.sin(performance.now()/300));
-    if(L.on){
-      var g = ctx.createRadialGradient(cx,L.y,2,cx,L.y,34);
-      g.addColorStop(0,L.col); g.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.globalAlpha=0.55*pulse; ctx.fillStyle=g;
-      ctx.beginPath(); ctx.arc(cx,L.y,34,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
-    }
+    ctx.save();
+    if(L.on){ ctx.shadowColor=L.col; ctx.shadowBlur=16; }
     ctx.fillStyle = L.on ? L.col : C.off;
-    ctx.beginPath(); ctx.arc(cx,L.y,13,0,6.2832); ctx.fill();
-    ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,L.y,12,0,6.2832); ctx.fill();
+    ctx.restore();
+    ctx.lineWidth=1.5; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.stroke();
     if(L.on){
-      ctx.fillStyle='rgba(255,255,255,.75)';
-      ctx.beginPath(); ctx.arc(cx-4,L.y-4,3.6,0,6.2832); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.55)';
+      ctx.beginPath(); ctx.arc(cx-3.5,L.y-3.5,3,0,6.2832); ctx.fill();
     }
   }
-
-  var word = light==='red' ? 'RED' : (light==='yellow' ? 'YELLOW' : 'GREEN');
+  var word = light==='red' ? 'RED' : (light==='yellow' ? 'YELLOW' : (light==='green' ? 'GREEN' : ''));
   var wcol = light==='red' ? C.red : (light==='yellow' ? C.amber : C.green);
-  txt(word, cx, ly+lh+20, 12, wcol, 'center', 2.5);
+  if(word) txt(word, cx, ly+lh+20, 11, wcol, 'center', 1);
+
+  // trial counter / restarts, mid-right
+  var label = trial && trial.isPractice ? 'PRACTICE ROUND' : ('TRIAL '+Math.min(trialIndex+1,TOTAL_TRIALS)+' / '+TOTAL_TRIALS);
+  txt(label, 482, 38, 13, '#E4DFF2', 'left', 1);
+  if(trial && trial.restarts>0){
+    txt('RESTARTS: '+trial.restarts, 482, 62, 13, '#8D84A8', 'left', 1.5);
+  }
 }
 
 function drawFloats(){
   for(var i=0;i<floats.length;i++){
     var f=floats[i];
     ctx.globalAlpha = Math.min(1, f.life*1.6);
-    txtShadow(f.txt, f.x, f.y, f.size, f.col, 'center', 2);
+    txtShadow(f.txt, f.x, f.y, f.size, f.col, 'center', 1);
     ctx.globalAlpha = 1;
   }
 }
 
 function panel(x,y,w,h){
-  ctx.fillStyle='rgba(11,16,26,.80)'; rr(x,y,w,h,16); ctx.fill();
-  ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.stroke();
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=24; ctx.shadowOffsetY=8;
+  ctx.fillStyle='rgba(20,15,40,.86)'; rr(x,y,w,h,14); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth=1.5; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x+14,y+1.5); ctx.lineTo(x+w-14,y+1.5); ctx.stroke();
 }
 function drawBtn(b,col,label,sub,dim){
   ctx.globalAlpha = dim ? 0.32 : 1;
-  ctx.fillStyle='rgba(255,255,255,.07)'; rr(b.x,b.y,b.w,b.h,12); ctx.fill();
-  ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke();
-  txt(label, b.x+b.w/2, b.y+b.h/2+(sub?-3:7), sub?19:20, col, 'center', 2.5);
+  ctx.save();
+  ctx.shadowColor=col; ctx.shadowBlur=dim?0:14; ctx.shadowOffsetY=2;
+  var bg = ctx.createLinearGradient(0,b.y,0,b.y+b.h);
+  bg.addColorStop(0,'rgba(255,255,255,.14)'); bg.addColorStop(1,'rgba(255,255,255,.04)');
+  ctx.fillStyle=bg; rr(b.x,b.y,b.w,b.h,10); ctx.fill();
+  ctx.restore();
+  ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke();
+  txt(label, b.x+b.w/2, b.y+b.h/2+(sub?-3:7), sub?18:18, col, 'center', 1.2);
   if(sub) txt(sub, b.x+b.w/2, b.y+b.h/2+17, 11, 'rgba(255,255,255,.6)', 'center', 1.5);
   ctx.globalAlpha = 1;
 }
 
-/* One lamp per round: five lights, five rounds, no second chances. */
-function drawLightTrack(){
-  var y = CONTROL_BAR_Y + 34, x0 = 34, r = 11, gap = 34;
-  txt('LIGHTS', x0, y - 22, 12, '#7F91AC', 'left', 2.5);
-  for(var i=0;i<TOTAL_ROUNDS;i++){
-    var cx = x0 + r + i*gap, done = results[i]==='clear', live = (i === round);
-    var col = done ? C.green
-            : (live ? (light==='red'?C.red:(light==='yellow'?C.amber:C.green)) : C.off);
-    if(live && light!=='off'){
-      var g = ctx.createRadialGradient(cx,y,2,cx,y,22);
-      g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.globalAlpha=0.5; ctx.fillStyle=g;
-      ctx.beginPath(); ctx.arc(cx,y,22,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
-    }
+/* Compact trial progress track, tucked into the dashboard's left edge so it
+   never runs into the GO/STOP/BANK buttons, which sit centered below.      */
+function drawTrialTrack(){
+  var y = CONTROL_BAR_Y + 20, r = 5, gap = 13;
+  var n = TOTAL_TRIALS;
+  var x0 = 26;
+  txt('TRIALS', x0, y - 10, 10, '#8D84A8', 'left', 2);
+  for(var i=0;i<n;i++){
+    var cx = x0 + r + i*gap;
+    var rec = trialLog[i];
+    var live = (!rec && i === trialIndex && trial && !trial.isPractice && state===ST.ACTIVE);
+    var col = rec ? (rec.outcome==='crash' ? C.red : C.green) : (live ? C.amber : C.off);
+    ctx.save();
+    if(live){ ctx.shadowColor=col; ctx.shadowBlur=8; }
     ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(cx,y,r,0,6.2832); ctx.fill();
-    ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.stroke();
+    ctx.restore();
+    ctx.lineWidth=1.5; ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.stroke();
   }
-  txt('ROUND '+Math.min(round+1,TOTAL_ROUNDS)+' OF '+TOTAL_ROUNDS,
-      x0 + TOTAL_ROUNDS*gap + 12, y+5, 14, '#C9D8EC', 'left', 2);
+  txt('CRASHES '+crashCount, x0, y + 22, 12, '#C4BEDD', 'left', 1.2);
 }
 
 function drawControls(){
-  if(state === ST.ROUND_READY){
-    drawBtn(BTN_BEGIN, C.green, 'BEGIN', 'SPACE');
-  } else if(state === ST.MOVING || state === ST.BRAKING || state === ST.RED || state === ST.GREEN){
-    drawBtn(BTN_STOP, C.red, 'STOP', 'SPACE', state !== ST.MOVING);
+  if(state === ST.ACTIVE){
+    if(trial.moving){
+      drawBtn(BTN_STOP, C.red, 'STOP', 'SPACE');
+    } else {
+      drawBtn(BTN_GO, C.green, 'GO', 'SPACE');
+      drawBtn(BTN_BANK, C.gold, 'BANK', 'B');
+    }
   }
-  if(state !== ST.OVER && state !== ST.GAMEOVER) drawLightTrack();
-
-  // live speed readout — the number that makes holding yellow feel worth it
-  if(state===ST.MOVING || state===ST.RED || state===ST.BRAKING){
-    var mph = Math.round((state===ST.BRAKING ? car.visV : car.v) / 4);
-    txt('SPEED', W-34, CONTROL_BAR_Y+22, 12, '#7F91AC', 'right', 2.5);
-    txt(mph+' MPH', W-34, CONTROL_BAR_Y+50, 22, state===ST.MOVING?C.amber:'#9BE3FF', 'right', 1);
-  }
+  if(state !== ST.SUMMARY) drawTrialTrack();
 }
 
 function drawOverlays(){
+  var pulse = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
+
   if(state === ST.TITLE){
-    ctx.fillStyle='rgba(8,12,20,.42)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-310,90,620,354);
-    txtShadow('CHICKEN', W/2, 178, 66, C.amber, 'center', 9);
-    txt('A RISK-TAKING DRIVING GAME', W/2, 208, 14, '#9FB6D2', 'center', 4);
-    txt('FIVE ROUNDS, ONE LIGHT EACH. Yellow lasts an unknown time', W/2, 248, 17, '#E6EEF8', 'center', 0, 700);
-    txt('and the car accelerates the whole way through it — the further', W/2, 272, 17, '#E6EEF8', 'center', 0, 700);
-    txt('you get on yellow, the more you score. Green pays nothing.', W/2, 296, 17, '#E6EEF8', 'center', 0, 700);
-    txt('STOP on yellow to clear the round. Reach RED and the wall', W/2, 320, 17, '#FFB4B4', 'center', 0, 700);
-    txt('drops \u2014 every time \u2014 and the whole run is over.', W/2, 344, 17, '#FFB4B4', 'center', 0, 700);
-    txt('Clear all five and a SPEED BONUS pays on your average speed.', W/2, 376, 15, '#FFD9A6', 'center', 0, 700);
-    var pulse = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
+    ctx.fillStyle='rgba(16,10,30,.55)'; ctx.fillRect(0,0,W,H);
+    panel(W/2-320,70,640,400);
+    txtShadow('CHICKEN', W/2, 156, 52, C.amber, 'center', 2);
+    txt('A RISK-TAKING DRIVING GAME', W/2, 184, 14, '#B6A8DC', 'center', 1.5);
+    txt('Your car starts moving on its own. Points add up the longer it moves.', W/2, 222, 16, '#EDE7F8', 'center', 0, 700);
+    txt('At some point the light turns yellow, then red — and a wall drops.', W/2, 244, 16, '#EDE7F8', 'center', 0, 700);
+    txt('Still moving when the wall lands? You crash and lose everything', W/2, 266, 16, '#C9938E', 'center', 0, 700);
+    txt('you earned that round. Stop in time and you can BANK your points', W/2, 288, 16, '#EDE7F8', 'center', 0, 700);
+    txt('or press GO to risk moving further for more.', W/2, 310, 16, '#EDE7F8', 'center', 0, 700);
+    txt('1 practice round, then 5 real trials. Timing is random every time.', W/2, 342, 15, '#C9AE7E', 'center', 0, 700);
     ctx.globalAlpha=pulse;
-    txt('PRESS SPACE OR TAP TO START — 5 ROUNDS, NO RETRIES', W/2, 412, 18, C.green, 'center', 3);
+    txt('PRESS SPACE OR TAP TO START', W/2, 384, 16, C.green, 'center', 1.5);
     ctx.globalAlpha=1;
     return;
   }
 
-  if(state === ST.ROUND_READY){
-    txtShadow('ROUND '+(round+1), W/2, 168, 46, '#FFFFFF', 'center', 5);
-    txt('ONE LIGHT  ·  STOP ON YELLOW  ·  RED ENDS THE RUN', W/2, 200, 15, '#B9CBE2', 'center', 3);
+  if(state === ST.PRACTICE_INTRO){
+    ctx.fillStyle='rgba(16,10,30,.55)'; ctx.fillRect(0,0,W,H);
+    panel(W/2-280,150,560,260);
+    txtShadow('PRACTICE ROUND', W/2, 216, 32, '#F0EBFA', 'center', 1.5);
+    txt('Points here do not count. This is just to feel out a crash', W/2, 254, 15, '#C4BEDD', 'center', 0, 700);
+    txt('before the real trials begin.', W/2, 274, 15, '#C4BEDD', 'center', 0, 700);
+    ctx.globalAlpha=pulse;
+    drawBtn(BTN_BEGIN, C.green, 'BEGIN', 'SPACE');
+    ctx.globalAlpha=1;
     return;
   }
 
-  if(state === ST.ENTER){
+  if(state === ST.PRACTICE_DONE){
+    ctx.fillStyle='rgba(16,10,30,.55)'; ctx.fillRect(0,0,W,H);
+    panel(W/2-280,150,560,260);
+    txtShadow('PRACTICE COMPLETE', W/2, 216, 28, '#F0EBFA', 'center', 1.5);
+    txt('Ready for the 5 real trials? Every point you bank stays banked.', W/2, 254, 15, '#C4BEDD', 'center', 0, 700);
+    txt('Every crash costs only that trial’s points.', W/2, 274, 15, '#C4BEDD', 'center', 0, 700);
+    ctx.globalAlpha=pulse;
+    drawBtn(BTN_BEGIN, C.green, 'START TRIALS', 'SPACE');
+    ctx.globalAlpha=1;
+    return;
+  }
+
+  if(state === ST.TRIAL_INTRO){
     var a = Math.min(1, st*4);
     ctx.globalAlpha=a;
-    txtShadow('ROUND '+(round+1), W/2, 168, 50, '#FFFFFF', 'center', 5);
+    txtShadow('TRIAL '+(trialIndex+1)+' / '+TOTAL_TRIALS, W/2, 168, 38, '#F0EBFA', 'center', 1.5);
     ctx.globalAlpha=1;
     return;
   }
 
-  if(banner && state === ST.RESOLVE_ROUND){
-    var t = st, al = Math.min(1, t*5) * (t>1.0 ? Math.max(0,(1.4-t)/0.4) : 1);
+  if(banner && state === ST.RESOLVE){
+    var t = st;
+    var dur = trial.outcome==='crash' ? 1.4 : 1.1;
+    var al = Math.min(1, t*5) * (t>dur-0.4 ? Math.max(0,(dur-t)/0.4) : 1);
     ctx.globalAlpha=al;
-    txtShadow(banner.big, W/2, 150, 46, banner.col, 'center', 5);
-    txt(banner.sub, W/2, 184, 17, '#E9F1FA', 'center', 2);
-    ctx.globalAlpha=1;
-  }
-  if(banner && state === ST.RESOLVE_CRASH){
-    var t2 = st, al2 = Math.min(1, t2*5);
-    ctx.globalAlpha=al2;
-    txtShadow(banner.big, W/2, 150, 50, banner.col, 'center', 5);
-    txt(banner.sub, W/2, 182, 16, '#E9F1FA', 'center', 2);
+    txtShadow(banner.big, W/2, 150, trial.outcome==='crash'?36:34, banner.col, 'center', 1.5);
+    txt(banner.sub, W/2, 184, 15, '#C4BEDD', 'center', 1);
     ctx.globalAlpha=1;
   }
 
-  if(state === ST.GAMEOVER){
-    ctx.fillStyle='rgba(8,12,20,.56)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-300,140,600,286);
-    txtShadow('GAME OVER', W/2, 214, 54, C.red, 'center', 5);
-    txt('You held the yellow too long in round '+(round+1)+' of '+TOTAL_ROUNDS+'.', W/2, 252, 16, '#C4D5EA', 'center', 0, 700);
-    txt('Every point is gone. The run starts again from round 1.', W/2, 276, 16, '#C4D5EA', 'center', 0, 700);
-    txt('CLEARED '+results.length+' / '+TOTAL_ROUNDS+'   \u00B7   BEST RUN '+bestScore,
-        W/2, 318, 16, '#8FA3BF', 'center', 2.5);
-    var pg = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
-    ctx.globalAlpha=pg;
-    txt('PRESS SPACE OR TAP TO START OVER', W/2, 372, 19, C.green, 'center', 3);
-    ctx.globalAlpha=1;
-    txt('R  RESTART', W/2, 404, 12, 'rgba(255,255,255,.45)', 'center', 2.5);
-    return;
-  }
+  if(state === ST.SUMMARY){
+    ctx.fillStyle='rgba(16,10,30,.62)'; ctx.fillRect(0,0,W,H);
+    panel(W/2-310,70,620,420);
+    txtShadow(TOTAL_TRIALS+' TRIALS COMPLETE', W/2, 130, 30, '#F0EBFA', 'center', 1.5);
 
-  if(state === ST.OVER){
-    ctx.fillStyle='rgba(8,12,20,.5)'; ctx.fillRect(0,0,W,H);
-    panel(W/2-300,96,600,368);
-    txtShadow('ALL FIVE CLEARED', W/2, 164, 40, '#FFFFFF', 'center', 4);
-    txt('FINAL SCORE', W/2, 202, 14, '#9FB6D2', 'center', 4);
-    txtShadow(String(finalTotal), W/2, 266, 64, C.gold, 'center', 4);
+    var avgPct = 0, nPct = 0;
+    for(var i=0;i<trialLog.length;i++){
+      if(trialLog[i].pctMovingAfterYellow != null){ avgPct += trialLog[i].pctMovingAfterYellow; nPct++; }
+    }
+    avgPct = nPct ? Math.round((avgPct/nPct)*10)/10 : 0;
+    var totalRestarts = trialLog.reduce(function(s,r){ return s+r.restarts; }, 0);
 
-    // the split, so the speed bonus reads as the payoff for pushing yellow
-    txt('DISTANCE', W/2-150, 306, 13, '#9FB6D2', 'center', 2.5);
-    txt(String(Math.round(score)), W/2-150, 336, 26, '#E6EEF8', 'center', 1);
-    txt('+', W/2, 332, 24, '#6C7C93', 'center', 1);
-    txt('SPEED BONUS', W/2+150, 306, 13, '#9FB6D2', 'center', 2.5);
-    txt(String(finalBonus), W/2+150, 336, 26, C.gold, 'center', 1);
+    txt('BANK ACCOUNT', W/2-190, 176, 12, '#B6A8DC', 'center', 1);
+    txtShadow(String(bankAccount), W/2-190, 218, 40, C.gold, 'center', 2);
 
-    txt('AVG '+Math.round(avgSpeed()/4)+' MPH OVER '+runTime.toFixed(1)+'S   \u00B7   BEST RUN '+bestScore,
-        W/2, 372, 14, '#B9CBE2', 'center', 2);
-    var p2 = 0.6+0.4*Math.abs(Math.sin(performance.now()/380));
-    ctx.globalAlpha=p2;
-    txt('PRESS SPACE OR TAP TO RUN AGAIN', W/2, 420, 18, C.green, 'center', 3);
+    txt('CRASHES', W/2, 176, 12, '#B6A8DC', 'center', 1);
+    txtShadow(crashCount+' / '+TOTAL_TRIALS, W/2, 218, 40, crashCount>0?C.red:C.green, 'center', 2);
+
+    txt('AVG TIME MOVING AFTER YELLOW', W/2+190, 176, 11, '#B6A8DC', 'center', 0.8);
+    txtShadow(avgPct+'%', W/2+190, 218, 40, '#9AA6D8', 'center', 2);
+
+    txt('Risk-taking score: the average % of time the car kept moving', W/2, 264, 14, '#C4BEDD', 'center', 0, 700);
+    txt('after the light turned yellow, across all '+TOTAL_TRIALS+' trials.', W/2, 284, 14, '#C4BEDD', 'center', 0, 700);
+    txt('TOTAL RESTARTS ACROSS ALL TRIALS: '+totalRestarts, W/2, 316, 14, '#9084B0', 'center', 1.5);
+    txt('BEST BANK ACCOUNT THIS SESSION: '+bestBank, W/2, 340, 14, '#9084B0', 'center', 1.5);
+    txt('Use the Download CSV button above to export trial-by-trial data.', W/2, 372, 13, '#8D84A8', 'center', 1);
+
+    ctx.globalAlpha=pulse;
+    txt('PRESS SPACE OR TAP TO PLAY AGAIN', W/2, 418, 16, C.green, 'center', 1.5);
     ctx.globalAlpha=1;
   }
 }
@@ -930,24 +933,16 @@ function draw(){
   ctx.restore();
 
   if(flash > 0){
-    ctx.fillStyle = 'rgba(255,90,90,'+(flash*0.42)+')';
+    ctx.fillStyle = 'rgba(240,71,63,'+(flash*0.26)+')';
     ctx.fillRect(0,0,W,H);
   }
   drawControlBar();
   if(state !== ST.TITLE){ drawScoreboard(); drawControls(); }
   drawFloats();
   drawOverlays();
-
-  var v = ctx.createRadialGradient(W/2,H/2,H*0.42,W/2,H/2,H*0.95);
-  v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(6,10,18,.28)');
-  ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
 }
 
 /* ================= loop ================= */
-car = {x:CAR_X, v:140, enter:1, dead:false, squash:0, tilt:0, visV:0};
-light = 'off';
-wall = {up:false, rise:0, x:0, landed:false};
-
 var last = performance.now();
 function loop(now){
   var dt = Math.min(0.05, (now-last)/1000);
